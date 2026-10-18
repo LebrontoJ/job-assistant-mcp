@@ -32,13 +32,16 @@ with response caching and rate-limit-aware concurrency, so the same suite compar
 ## Milestones
 
 1. **M1 skeleton** (done): MCP server, store, JD parser, LLM interface + Gemini adapter, agent loop, tests.
-2. **M2 RAG**: chunking, index, `search_profile`, `match_resume`, citations.
+2. **M2 RAG** (done): heading-aware chunking, BM25 (EN + CJK), RRF hybrid with a pluggable `Embedder`, `search_profile`, `match_resume` with chunk-id citations. The real local embedder (transformers.js) is not wired yet: it downloads a model at first use.
 3. **M3 agent flows**: JD -> match -> bullets -> add to tracker, verified against live Gemini.
 4. **M4 evals**: cases, runner, judge, response cache, baseline on Gemini.
 5. **M4.5 Claude adapter**: same suite, comparison table.
 6. **M5 iterate + polish**: one measured improvement round, README demo and results.
 
 ## Open items
+
+- Plug in a local embedding model and compare BM25 vs hybrid recall@k on the eval set.
+- `match_resume` ignores numeric requirements (years of experience).
 
 - Verify the Gemini adapter against the live API (needs a key); confirm the free-tier model ID and quota in AI Studio.
 - Pensum JSON compatibility for the tracker store.

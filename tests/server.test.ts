@@ -9,7 +9,9 @@ describe("MCP server", () => {
       "add_application",
       "list_applications",
       "list_followups",
+      "match_resume",
       "parse_jd",
+      "search_profile",
       "update_application",
     ]);
     const add = tools.find((t) => t.name === "add_application")!;

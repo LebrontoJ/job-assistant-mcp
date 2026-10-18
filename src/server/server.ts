@@ -1,8 +1,10 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
+import type { ProfileIndex } from "../rag/index.js";
 import { ApplicationStore, StatusSchema } from "../store/applications.js";
 import { parseJd } from "./jd.js";
+import { matchProfile } from "./match.js";
 
 const json = (value: unknown): CallToolResult => ({
   content: [{ type: "text", text: JSON.stringify(value, null, 2) }],
@@ -21,7 +23,7 @@ const confirmField = z
   .optional()
   .describe("Must be true to actually write. Set it only after the user has explicitly approved the change.");
 
-export function createServer(store: ApplicationStore): McpServer {
+export function createServer(store: ApplicationStore, profile?: ProfileIndex): McpServer {
   const server = new McpServer({ name: "job-assistant", version: "0.1.0" });
 
   server.registerTool(
@@ -112,6 +114,54 @@ export function createServer(store: ApplicationStore): McpServer {
         return json({ status: "pending_confirmation", current, changes: patch, hint: PENDING_HINT });
       }
       return json({ status: "updated", application: await store.update(id, patch) });
+    },
+  );
+
+  const noProfile = () =>
+    fail("No profile documents are loaded. Add Markdown files to the profile directory (PROFILE_DIR) and restart.");
+
+  server.registerTool(
+    "search_profile",
+    {
+      title: "Search profile",
+      description:
+        "Search the user's own profile documents (resume, projects, STAR stories) and return the most relevant " +
+        "passages with ids to cite. Use it before claiming anything about the user's experience. " +
+        "If nothing relevant comes back, the profile does not contain it.",
+      inputSchema: {
+        query: z.string().min(2).describe("What to look for, e.g. 'postgres performance' or 'led an incident'."),
+        k: z.number().int().min(1).max(10).optional().describe("Number of passages. Default 5."),
+      },
+    },
+    async ({ query, k }) => {
+      if (!profile?.size) return noProfile();
+      const hits = await profile.search(query, k ?? 5);
+      return json({
+        query,
+        hits: hits.map((h) => ({
+          id: h.chunk.id,
+          source: h.chunk.source,
+          heading: h.chunk.heading,
+          text: h.chunk.text,
+          score: Number(h.score.toFixed(3)),
+        })),
+      });
+    },
+  );
+
+  server.registerTool(
+    "match_resume",
+    {
+      title: "Match profile to JD",
+      description:
+        "Compare a job description with the user's profile. For each requirement and nice-to-have it reports " +
+        "whether the profile has supporting evidence (with chunk ids), and which JD skills appear or are missing. " +
+        "Read-only; the result is a retrieval signal for you to interpret, not a final verdict.",
+      inputSchema: { jd_text: z.string().min(20).describe("The full job description text.") },
+    },
+    async ({ jd_text }) => {
+      if (!profile?.size) return noProfile();
+      return json(await matchProfile(parseJd(jd_text), profile));
     },
   );
 
