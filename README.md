@@ -1,5 +1,7 @@
 # job-assistant-mcp
 
+[![CI](https://github.com/LebrontoJ/job-assistant-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/LebrontoJ/job-assistant-mcp/actions/workflows/ci.yml) ![license](https://img.shields.io/badge/license-MIT-blue)
+
 An MCP job-search assistant: a tool-calling agent over an MCP server, a lightweight RAG layer over
 your own profile, and a small eval harness that tells you whether a change made things better.
 
@@ -81,6 +83,10 @@ pnpm eval --judge              # 29-case agent suite on the configured model, wi
 
 Rule-based graders check tool choice, arguments, the write-confirmation gate, citations and number grounding; an LLM
 judge covers the rest. Gemini baseline: 28/29 cases with either BM25 or hybrid retrieval. Details, caveats and what the failures showed: [docs/EVALS.md](docs/EVALS.md).
+
+## Demo
+
+Unedited runs against Gemini, including the model's mistakes: [docs/demo.md](docs/demo.md).
 
 ## Privacy
 

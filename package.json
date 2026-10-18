@@ -1,6 +1,8 @@
 {
   "name": "job-assistant-mcp",
   "version": "0.1.0",
+  "license": "MIT",
+  "packageManager": "pnpm@11.8.0",
   "private": true,
   "description": "MCP job-search assistant: tool-calling agent, lightweight RAG over your own profile, and a small eval harness.",
   "type": "module",

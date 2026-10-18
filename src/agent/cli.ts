@@ -5,6 +5,8 @@ import { createLLM } from "./llm/index.js";
 import { runAgent } from "./loop.js";
 import type { Message } from "./llm/types.js";
 
+const shorten = (s: string, n = 140) => (s.length > n ? `${s.slice(0, n)}… (${s.length} chars)` : s);
+
 async function main() {
   try {
     process.loadEnvFile(".env");
@@ -27,7 +29,7 @@ async function main() {
   const ask = async (text: string) => {
     const run = await runAgent(llm, mcp, text, { history });
     history = run.messages;
-    for (const t of run.trace) console.error(`  [tool] ${t.name}(${JSON.stringify(t.args)})${t.isError ? " -> error" : ""}`);
+    for (const t of run.trace) console.error(`  [tool] ${t.name}(${shorten(JSON.stringify(t.args))})${t.isError ? " -> error" : ""}`);
     console.log(run.answer || `(no answer: ${run.stoppedBecause})`);
   };
 
