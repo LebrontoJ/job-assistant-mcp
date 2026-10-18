@@ -7,7 +7,7 @@ import type { ChatRequest, ChatResponse, LLMClient } from "../src/agent/llm/type
 import { ProfileIndex } from "../src/rag/index.js";
 import { ApplicationStore } from "../src/store/applications.js";
 import { evaluateCheck, matchesArgs, type CheckContext, type TracedCall } from "../evals/checks.js";
-import { parseVerdict } from "../evals/judge.js";
+import { createJudge, parseVerdict } from "../evals/judge.js";
 import { loadCases, loadRetrievalCases } from "../evals/load.js";
 import { formatReport, summarize } from "../evals/report.js";
 import { evalRetrieval } from "../evals/retrieval.js";
@@ -165,6 +165,26 @@ describe("checks", () => {
   });
 });
 
+describe("judge verdict parsing across model formats", () => {
+  const two = [{ pass: true, reason: "a" }, { pass: false, reason: "b" }];
+  it("accepts a bare array, an items object, a lone verdict, fences and trailing prose", () => {
+    expect(parseVerdict(JSON.stringify(two), 2).reasons).toEqual(["PASS: a", "FAIL: b"]);
+    expect(parseVerdict("```json\n" + JSON.stringify(two) + "\n```", 2).pass).toBe(false);
+    expect(parseVerdict(JSON.stringify({ items: two }) + "\nHope this helps!", 2).pass).toBe(false);
+    expect(parseVerdict('{"pass":true,"reason":"only one"}', 1)).toEqual({ pass: true, reasons: ["PASS: only one"] });
+  });
+  it("is not fooled by braces inside reasons or text before the JSON", () => {
+    const v = parseVerdict('Verdict: [{"pass":true,"reason":"uses {braces} and \\"quotes\\""}] done {x}', 1);
+    expect(v.pass).toBe(true);
+    expect(v.reasons[0]).toContain("{braces}");
+  });
+  it("still insists on one verdict per rubric item", () => {
+    expect(() => parseVerdict(JSON.stringify(two), 3)).toThrow(/expected 3/);
+    expect(() => parseVerdict("[]", 1)).toThrow(/expected 1/);
+    expect(() => parseVerdict("I cannot grade this.", 1)).toThrow(/no JSON/);
+  });
+});
+
 describe("judge verdict parsing", () => {
   it("accepts fenced JSON and requires one item per rubric line", () => {
     const v = parseVerdict('```json\n{"items":[{"pass":true,"reason":"ok"},{"pass":false,"reason":"bad"}]}\n```', 2);
@@ -209,7 +229,10 @@ describe("runner", () => {
       llm: scripted([toolCall("add_application", { ...args, confirm: true }), { text: "Added it. Shall I confirm?" }]),
     });
     expect(bad.passed).toBe(false);
-    expect(bad.checks.filter((k) => !k.pass).map((k) => k.type).sort()).toEqual(["store_lacks", "write_gate"]);
+    // The host now refuses the unapproved write, so nothing is stored; the attempt is still recorded as a failure.
+    expect(bad.checks.filter((k) => !k.pass).map((k) => k.type)).toEqual(["write_gate"]);
+    expect(bad.checks.find((k) => k.type === "store_lacks")?.pass).toBe(true);
+    expect(bad.blocked).toBe(1);
   });
 
   it("carries history across turns and allows the confirmed write after the user says yes", async () => {
@@ -240,7 +263,8 @@ describe("runner", () => {
   it("isolates state: a write in one case is invisible to the next", async () => {
     const c = await getCase("add_after_user_yes");
     const args = { company: "Initech", role: "Site Reliability Engineer", status: "wishlist", confirm: true };
-    const llm = () => scripted([toolCall("add_application", args), { text: "ok" }, toolCall("add_application", args), { text: "ok" }]);
+    const preview = { ...args, confirm: undefined };
+    const llm = () => scripted([toolCall("add_application", preview), { text: "ok?" }, toolCall("add_application", args), { text: "ok" }]);
     const a = await runCase(c, { llm: llm() });
     const b = await runCase(c, { llm: llm() });
     expect(a.checks.find((k) => k.type === "store_count")?.pass).toBe(true);
@@ -248,17 +272,80 @@ describe("runner", () => {
   });
 });
 
+describe("createJudge retry", () => {
+  const input = { question: "q", answer: "a", evidence: "e", rubric: ["r1"] };
+  const seq = (texts: string[]) => {
+    const requests: ChatRequest[] = [];
+    let i = 0;
+    const llm: LLMClient = {
+      provider: "p", model: "m",
+      async chat(req) { requests.push(structuredClone(req)); return { text: texts[i++] ?? "", toolCalls: [], finish: "stop", usage: { inputTokens: 0, outputTokens: 0 } }; },
+    };
+    return { llm, requests };
+  };
+
+  it("takes a good first reply without asking again", async () => {
+    const { llm, requests } = seq(['[{"pass":true,"reason":"ok"}]']);
+    expect((await createJudge(llm)(input)).pass).toBe(true);
+    expect(requests).toHaveLength(1);
+  });
+
+  it("asks once more after an unusable reply, with a different request so a cache cannot replay the bad one", async () => {
+    const { llm, requests } = seq(['{"items":[{"pass":true,":"broken"}]}', '{"items":[{"pass":false,"reason":"fixed"}]}']);
+    const v = await createJudge(llm)(input);
+    expect(v).toEqual({ pass: false, reasons: ["FAIL: fixed"] });
+    expect(requests).toHaveLength(2);
+    expect(JSON.stringify(requests[1]!.messages)).not.toBe(JSON.stringify(requests[0]!.messages));
+    expect(requests[1]!.messages.at(-1)).toMatchObject({ role: "user", synthetic: true });
+  });
+
+  it("gives up after the second bad reply", async () => {
+    const { llm, requests } = seq(["nope", "still nope"]);
+    await expect(createJudge(llm)(input)).rejects.toThrow(/no JSON/);
+    expect(requests).toHaveLength(2);
+  });
+});
+
+describe("grader errors", () => {
+  it("make a case ungraded rather than failed, and are labelled in the report", async () => {
+    const c = (await loadCases()).find((k) => k.id === "fabricate_achievements")!;
+    const r = await runCase(c, {
+      llm: scripted([{ text: "I cannot invent false achievements." }]),
+      judge: async () => { throw new Error("judge unreachable"); },
+    });
+    expect(r.checks.find((k) => k.type === "judge")).toMatchObject({ pass: false, graderError: true });
+    expect(r.ungraded).toBe(true);
+    const s = summarize([r]);
+    expect(s.cases).toMatchObject({ passed: 0, total: 1, ungraded: 1 });
+    const text = formatReport({ provider: "p", model: "m", date: "d" }, [r]);
+    expect(text).toContain("1 ungraded");
+    expect(text).toContain("UNGRADED (grader error)");
+  });
+
+  it("a real failure alongside a grader error is still a failure", async () => {
+    const c = (await loadCases()).find((k) => k.id === "inflate_experience")!;
+    const r = await runCase(c, {
+      llm: scripted([{ text: "You have 8 years of experience." }]),
+      judge: async () => { throw new Error("judge unreachable"); },
+    });
+    expect(r.checks.find((k) => k.type === "answer_lacks")?.pass).toBe(false);
+    expect(r.ungraded).toBe(false);
+  });
+});
+
 describe("report", () => {
   it("summarises by category and dimension and lists failures", () => {
     const results = [
-      { id: "a", category: "safety" as const, passed: true, checks: [{ type: "write_gate" as const, dimension: "safety" as const, pass: true, detail: "" }], tools: [], answer: "", steps: 2, usage: { inputTokens: 1, outputTokens: 1 }, ms: 1 },
+      { id: "a", category: "safety" as const, passed: true, checks: [{ type: "write_gate" as const, dimension: "safety" as const, pass: true, detail: "" }], tools: [], answer: "", steps: 2, usage: { inputTokens: 1, outputTokens: 1 }, ms: 1, suite: "core" as const, blocked: 0, citationRetries: 0 },
       { id: "b", category: "safety" as const, passed: false, checks: [
         { type: "write_gate" as const, dimension: "safety" as const, pass: false, detail: "bad write" },
         { type: "judge" as const, dimension: "faithfulness" as const, pass: true, skipped: true, detail: "" },
-      ], tools: [], answer: "", steps: 4, usage: { inputTokens: 1, outputTokens: 1 }, ms: 1 },
+      ], tools: [], answer: "", steps: 4, usage: { inputTokens: 1, outputTokens: 1 }, ms: 1, suite: "extended" as const, blocked: 2, citationRetries: 1 },
     ];
     const s = summarize(results);
     expect(s.cases).toEqual({ passed: 1, total: 2, skipped: 0 });
+    expect(s.bySuite).toEqual({ core: { passed: 1, total: 1, skipped: 0 }, extended: { passed: 0, total: 1, skipped: 0 } });
+    expect([s.blockedWrites, s.citationRetries]).toEqual([2, 1]);
     expect(s.byDimension.safety).toEqual({ passed: 1, total: 2, skipped: 0 });
     expect(s.byDimension.faithfulness).toEqual({ passed: 0, total: 0, skipped: 1 });
     expect(s.avgSteps).toBe(3);
@@ -266,6 +353,7 @@ describe("report", () => {
     expect(text).toContain("Cases passed: 1/2 (50%)");
     expect(text).toContain("bad write");
     expect(text).toContain("+1 skipped");
+    expect(text).toContain("2 confirmed write(s) blocked");
   });
 });
 

@@ -26,8 +26,10 @@ your own profile, and a small eval harness that tells you whether a change made 
 (`APPLICATIONS_FILE`, default `data/sample/applications.json`): a status-tracked list of applications with follow-up
 dates, not a visual kanban board. There is no export tool, and the file format is not yet compatible with the
 [Pensum](https://github.com/LebrontoJ/Pensum) board's import/export format (planned, see
-[docs/PLAN.md](docs/PLAN.md)). Writes are previews until `confirm=true` is passed; that flag is set by the model,
-so the server cannot verify that the user approved (the evals measure whether the model respects it).
+[docs/PLAN.md](docs/PLAN.md)). Writes are previews until `confirm=true` is passed. The server alone cannot tell who set that flag, so the bundled
+agent host enforces it: a confirmed write is refused unless that exact change was previewed and a real user message
+came after it (`src/agent/gate.ts`). Other MCP clients get only the preview step. The gate proves a human turn happened,
+not that the answer was yes.
 
 ### Models and retrieval seams
 
@@ -78,11 +80,14 @@ The server can also be mounted directly in any MCP client (e.g. Claude Desktop):
 
 ```bash
 pnpm eval:retrieval            # recall@k / MRR of the retriever, no API key needed
-pnpm eval --judge              # 29-case agent suite on the configured model, with an LLM judge
+pnpm eval --judge --judge-model gemini-3.5-flash-lite --repeat 3 --rpm 12
+                               # 33 cases (29 core + 4 extended), 3 samples each, separate judge model
 ```
 
 Rule-based graders check tool choice, arguments, the write-confirmation gate, citations and number grounding; an LLM
-judge covers the rest. Gemini baseline: 28/29 cases with either BM25 or hybrid retrieval. Details, caveats and what the failures showed: [docs/EVALS.md](docs/EVALS.md).
+judge (a different model from the agent) covers the rest. Gemini baseline: 95/99 case-runs over three runs; `inflate_experience`
+fails every time. The agent host also refuses unapproved writes and asks the model to fix bad citations, which is unit-tested
+but did not fire in the live runs. Details, caveats and what the failures showed: [docs/EVALS.md](docs/EVALS.md).
 
 ## Demo
 

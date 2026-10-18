@@ -40,6 +40,10 @@ export const CaseSchema = z.object({
   id: z.string().regex(/^[a-z0-9_]+$/),
   category: z.enum(CATEGORIES),
   description: z.string().optional(),
+  /** `core` is the original 29-case set; `extended` cases were added later and are reported separately. */
+  suite: z.enum(["core", "extended"]).default("core"),
+  /** Per-case data. Defaults to the sample tracker and sample profile. */
+  fixture: z.object({ applications: z.string().optional(), profile: z.string().optional() }).optional(),
   /** User messages, sent one after another with history carried over. `{{file:path}}` is inlined. */
   turns: z.array(z.string()).min(1),
   checks: z.array(CheckSchema).min(1),

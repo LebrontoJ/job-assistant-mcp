@@ -9,6 +9,7 @@ import type { EvalCase } from "./types.js";
 export interface CaseResult {
   id: string;
   category: EvalCase["category"];
+  suite: EvalCase["suite"];
   passed: boolean;
   checks: CheckResult[];
   tools: string[];
@@ -16,6 +17,12 @@ export interface CaseResult {
   steps: number;
   usage: Usage;
   ms: number;
+  /** Confirmed writes the host refused (the model tried to skip preview/approval). */
+  blocked: number;
+  /** Times the citation guard sent the model back to fix its sources. */
+  citationRetries: number;
+  /** No real check failed, but a grader error left at least one check unevaluated. Neither pass nor fail. */
+  ungraded?: boolean;
   /** Set when the run itself failed (API error etc.), as opposed to a check failing. */
   error?: string;
 }
@@ -25,19 +32,22 @@ export interface RunOptions {
   judge?: Judge;
   maxSteps?: number;
   concurrency?: number;
-  makeEnv?: () => Promise<EvalEnv>;
+  makeEnv?: (c: EvalCase) => Promise<EvalEnv>;
   onResult?: (r: CaseResult, done: number, total: number) => void;
 }
 
 export async function runCase(c: EvalCase, opts: RunOptions): Promise<CaseResult> {
   const started = Date.now();
-  const env = await (opts.makeEnv ?? createEnv)();
+  const env = await (opts.makeEnv ??
+    ((k: EvalCase) => createEnv({ applications: k.fixture?.applications, profileDir: k.fixture?.profile })))(c);
   const usage: Usage = { inputTokens: 0, outputTokens: 0 };
   const trace: TracedCall[] = [];
   const answers: string[] = [];
   const stops: Array<AgentRun["stoppedBecause"]> = [];
   let history: Message[] = [];
   let steps = 0;
+  let blocked = 0;
+  let citationRetries = 0;
   try {
     for (const [turn, text] of c.turns.entries()) {
       const run = await runAgent(opts.llm, env.client, text, { history, maxSteps: opts.maxSteps });
@@ -46,6 +56,8 @@ export async function runCase(c: EvalCase, opts: RunOptions): Promise<CaseResult
       answers.push(run.answer);
       stops.push(run.stoppedBecause);
       steps += run.steps;
+      blocked += run.blockedWrites;
+      citationRetries += run.citationRetries;
       usage.inputTokens += run.usage.inputTokens;
       usage.outputTokens += run.usage.outputTokens;
     }
@@ -60,6 +72,7 @@ export async function runCase(c: EvalCase, opts: RunOptions): Promise<CaseResult
           type: check.type,
           dimension: "faithfulness",
           pass: false,
+          graderError: true,
           detail: `grader error: ${err instanceof Error ? err.message : err}`,
         });
       }
@@ -67,7 +80,11 @@ export async function runCase(c: EvalCase, opts: RunOptions): Promise<CaseResult
     return {
       id: c.id,
       category: c.category,
+      suite: c.suite,
+      blocked,
+      citationRetries,
       passed: checks.filter((k) => !k.skipped).every((k) => k.pass),
+      ungraded: checks.some((k) => k.graderError) && checks.every((k) => k.pass || k.skipped || k.graderError),
       checks,
       tools: trace.map((t) => t.name),
       answer: answers.at(-1) ?? "",
@@ -79,6 +96,9 @@ export async function runCase(c: EvalCase, opts: RunOptions): Promise<CaseResult
     return {
       id: c.id,
       category: c.category,
+      suite: c.suite,
+      blocked,
+      citationRetries,
       passed: false,
       checks: [],
       tools: trace.map((t) => t.name),

@@ -22,9 +22,14 @@ export class CachingLLM implements LLMClient {
   hits = 0;
   misses = 0;
 
+  /**
+   * `salt` selects an independent sample: 0 reuses the original cache entries, 1, 2, ... record fresh responses
+   * for repeated runs of the same request (without it every repeat would just replay the first answer).
+   */
   constructor(
     private readonly inner: LLMClient,
     private readonly dir: string,
+    private readonly salt = 0,
   ) {}
 
   get provider() {
@@ -41,6 +46,7 @@ export class CachingLLM implements LLMClient {
       system: req.system,
       messages: normalise(req.messages),
       tools: req.tools,
+      ...(this.salt ? { salt: this.salt } : {}),
     });
     return createHash("sha256").update(payload).digest("hex");
   }
