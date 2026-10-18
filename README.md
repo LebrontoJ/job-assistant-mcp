@@ -3,8 +3,8 @@
 An MCP job-search assistant: a tool-calling agent over an MCP server, a lightweight RAG layer over
 your own profile, and a small eval harness that tells you whether a change made things better.
 
-> Status: **M2 (RAG)**. MCP server, provider-neutral agent loop and profile retrieval work end to end.
-> The eval harness is next, see [docs/PLAN.md](docs/PLAN.md).
+> Status: **M4 (evals)**. MCP server, provider-neutral agent loop, profile retrieval and an eval harness work end to end;
+> a Gemini baseline is recorded in [docs/EVALS.md](docs/EVALS.md). Roadmap: [docs/PLAN.md](docs/PLAN.md).
 
 ## What works today
 
@@ -52,6 +52,16 @@ The server can also be mounted directly in any MCP client (e.g. Claude Desktop):
 } } }
 ```
 
+## Evals
+
+```bash
+pnpm eval:retrieval            # recall@k / MRR of the retriever, no API key needed
+pnpm eval --judge              # 29-case agent suite on the configured model, with an LLM judge
+```
+
+Rule-based graders check tool choice, arguments, the write-confirmation gate, citations and number grounding; an LLM
+judge covers the rest. Gemini baseline: 27/29 cases. Details, caveats and what the failures showed: [docs/EVALS.md](docs/EVALS.md).
+
 ## Privacy
 
 Only synthetic data lives in `data/sample/`. Your real profile and applications go in
@@ -67,5 +77,6 @@ src/rag/      tokenizer, heading-aware chunker, BM25, hybrid fusion
 src/store/    application tracker storage (JSON file)
 src/agent/    agent loop, CLI, llm/ (provider-neutral client + Gemini adapter)
 data/sample/  synthetic resume, JD, applications
+evals/        case files, graders, runner, retrieval metrics
 tests/        vitest; the agent loop is tested against the real server with a scripted model
 ```

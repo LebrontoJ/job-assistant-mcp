@@ -1,0 +1,3 @@
+{"id":"args_company_filter","category":"arguments","turns":["Show my applications at Contoso."],"checks":[{"type":"args","tool":"list_applications","match":{"company":{"$re":"contoso"}}},{"type":"answer_matches","pattern":"Data Engineer"}]}
+{"id":"args_followup_window","category":"arguments","turns":["What follow-ups are due in the next 30 days?"],"checks":[{"type":"args","tool":"list_followups","match":{"days":30}}]}
+{"id":"args_status_enum","category":"arguments","turns":["List everything still on my wishlist."],"checks":[{"type":"args","tool":"list_applications","match":{"status":"wishlist"}},{"type":"answer_matches","pattern":"Fabrikam"}]}

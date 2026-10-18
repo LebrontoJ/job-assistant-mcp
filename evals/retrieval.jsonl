@@ -1,0 +1,12 @@
+{"id":"r_postgres_latency","query":"PostgreSQL query latency","relevant":[{"source":"resume.md","heading":"Backend Engineer"}]}
+{"id":"r_postgres_paraphrase","query":"postgres performance tuning","relevant":[{"source":"resume.md","heading":"Backend Engineer"}],"note":"'postgres' vs 'PostgreSQL': lexical miss, a dense retriever should catch it"}
+{"id":"r_kafka_go","query":"kafka consumer written in go","relevant":[{"source":"projects.md","heading":"Job-alert pipeline"}]}
+{"id":"r_terraform_eks","query":"Terraform and EKS deployment","relevant":[{"source":"projects.md","heading":"Job-alert pipeline"}]}
+{"id":"r_rag_eval","query":"RAG answer quality evaluation","relevant":[{"source":"projects.md","heading":"Internal RAG assistant"}]}
+{"id":"r_rag_paraphrase","query":"question answering bot over support documents","relevant":[{"source":"projects.md","heading":"Internal RAG assistant"}],"note":"little word overlap with the source"}
+{"id":"r_release_speed","query":"faster releases with CI","relevant":[{"source":"stories.md","heading":"Reducing release time"}]}
+{"id":"r_docker_ci","query":"Docker based CI pipelines","relevant":[{"source":"resume.md","heading":"Backend Engineer"},{"source":"stories.md","heading":"Reducing release time"}]}
+{"id":"r_outage","query":"production outage runbook","relevant":[{"source":"stories.md","heading":"Handling an outage"}]}
+{"id":"r_incident_lead","query":"led an incident","relevant":[{"source":"stories.md","heading":"Handling an outage"}]}
+{"id":"r_aws_scale","query":"requests per day on AWS","relevant":[{"source":"resume.md","heading":"Backend Engineer"}]}
+{"id":"r_redis_cache","query":"Redis caching latency","relevant":[{"source":"projects.md","heading":"Job-alert pipeline"}]}

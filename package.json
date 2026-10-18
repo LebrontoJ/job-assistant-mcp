@@ -13,7 +13,8 @@
     "test": "vitest run",
     "server": "tsx src/server/index.ts",
     "agent": "tsx src/agent/cli.ts",
-    "eval": "tsx evals/run.ts"
+    "eval": "tsx evals/run.ts",
+    "eval:retrieval": "tsx evals/run.ts --retrieval-only"
   },
   "dependencies": {
     "@google/genai": "2.30.0",
