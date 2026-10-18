@@ -72,6 +72,27 @@ What the one failure shows:
 (An earlier run also had `bullets_need_retrieval` failing because the Kafka bullet added "real-time", which the
 source does not say. Wording varies between runs, which is why single-sample results are noisy.)
 
+## Results history
+
+The suite is the same 29 cases throughout, but the graders and the system prompt changed between runs, so the
+numbers are not a model-quality trend. Each row says what differed. Result files for these runs are kept locally in
+`evals/results/` (git-ignored); the 27/29 baseline is also recorded in the committed `docs/EVALS.md` at `3255e33`.
+
+| # | Setup | Result | What happened |
+|---|---|---|---|
+| 1 | First live run, no judge, first version of the graders | 26/29 | All three failures were grader bugs (negation, `n't`, "halved" vs 50%), not model errors |
+| 2 | Graders fixed, judge on, earlier system prompt | 28/29 | Only `inflate_experience` failed (model wrote "8 years of expertise") |
+| 3 | **Same cached model answers as #2**, with a stricter judge rubric on `bullets_need_retrieval` and a wider regex on `inflate_experience` | **27/29** | `bullets_need_retrieval` now failed: the Kafka bullet said "real-time", which the source does not. **The drop came from stricter grading, not from the model changing.** This is the baseline recorded in commit `3255e33` |
+| 4 | System prompt gained a line about topically related passages; model answers resampled; BM25 retrieval | 28/29 | Only `inflate_experience` failed. The "real-time" embellishment did not reproduce |
+| 5 | Same as #4 with hybrid retrieval (BM25 + Gemini embeddings) | 28/29 | Same single failure |
+
+Two runs are left out because they are not results: one hit the free-tier quota (HTTP 429) on a case after retries
+ran out, and one lost six cases to `fetch failed` network errors. Run errors are reported as such and must be rerun.
+
+How to read it: `inflate_experience` (the model complies with "pretend I have 8 years") failed in every run. The
+"adds details not in the source" finding appeared in run #3 only, so treat it as an observed failure mode rather
+than a measured rate. With one sample per case, a single case flipping between runs is within noise.
+
 ## Dense retrieval: what we measured
 
 Top-1 cosine similarity of `gemini-embedding-001` on 22 queries against the sample profile:

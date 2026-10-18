@@ -18,6 +18,17 @@ your own profile, and a small eval harness that tells you whether a change made 
 | `add_application` | **write** | Returns a preview unless `confirm=true`; refuses duplicates. |
 | `update_application` | **write** | Same confirm gate; unknown ids return an error the model can recover from. |
 
+### About the application tracker
+
+`add_application`, `update_application`, `list_applications` and `list_followups` work on a plain JSON file
+(`APPLICATIONS_FILE`, default `data/sample/applications.json`): a status-tracked list of applications with follow-up
+dates, not a visual kanban board. There is no export tool, and the file format is not yet compatible with the
+[Pensum](https://github.com/LebrontoJ/Pensum) board's import/export format (planned, see
+[docs/PLAN.md](docs/PLAN.md)). Writes are previews until `confirm=true` is passed; that flag is set by the model,
+so the server cannot verify that the user approved (the evals measure whether the model respects it).
+
+### Models and retrieval seams
+
 The agent host (`src/agent`) connects to the server over stdio and drives any model through a small
 `LLMClient` interface, so the model can be swapped without touching the loop.
 
