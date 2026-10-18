@@ -19,8 +19,17 @@ your own profile, and a small eval harness that tells you whether a change made 
 | `update_application` | **write** | Same confirm gate; unknown ids return an error the model can recover from. |
 
 The agent host (`src/agent`) connects to the server over stdio and drives any model through a small
-`LLMClient` interface, so the model can be swapped without touching the loop. Gemini (free tier) is the
-first adapter; Claude is planned so the same evals can compare both.
+`LLMClient` interface, so the model can be swapped without touching the loop.
+
+| Seam | Choose with | Status |
+|---|---|---|
+| Agent model: Gemini | `LLM_PROVIDER=gemini` | **Verified live** (free tier), baseline in [docs/EVALS.md](docs/EVALS.md) |
+| Agent model: Claude | `LLM_PROVIDER=anthropic` (default `claude-opus-5-5`) | Implemented; unit-tested and checked against the real SDK's HTTP request shape with a fake network. **Not yet run against the live API** |
+| Eval judge | `--judge-provider/--judge-model` or `JUDGE_PROVIDER/JUDGE_MODEL` | Independent of the agent model; never inherits its model id |
+| Dense retrieval | `EMBEDDINGS=none\|local` | Fusion logic tested with a fake embedder; `local` model **not implemented yet** |
+
+The Claude adapter replays the model's own content blocks between tool calls (thinking blocks must come back
+unchanged) and enables server-side refusal fallback by default; set `LLM_FALLBACK=off` on Bedrock/Vertex/Foundry.
 
 ## Retrieval
 

@@ -35,10 +35,12 @@ with response caching and rate-limit-aware concurrency, so the same suite compar
 2. **M2 RAG** (done): heading-aware chunking, BM25 (EN + CJK), RRF hybrid with a pluggable `Embedder`, `search_profile`, `match_resume` with chunk-id citations. The real local embedder (transformers.js) is not wired yet: it downloads a model at first use.
 3. **M3 agent flows** (done): grounding rules, MCP prompts, JD -> match -> bullets -> preview -> confirmed write verified on live Gemini.
 4. **M4 evals** (done): 29 cases, rule + LLM-judge graders, response cache, retrieval metrics, Gemini baseline (see docs/EVALS.md).
-5. **M4.5 Claude adapter**: same suite, comparison table.
+5. **M4.5 Claude adapter**: adapter written and unit-tested (done); live run + same-suite comparison table still needs an Anthropic credential.
 6. **M5 iterate + polish**: one measured improvement round, README demo and results.
 
 ## Open items
+
+- Run the suite on Claude (agent and, separately, judge) and publish the comparison table; until then the Claude path is untested live.
 
 - `--repeat N` to measure run-to-run variance; grow the case set to 30-50.
 - Judge with a stronger model than the one under test.

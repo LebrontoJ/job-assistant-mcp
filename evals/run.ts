@@ -44,8 +44,13 @@ async function main() {
 
   const base = createLLM({ provider: values.provider, model: values.model });
   const llm = flags.has("no-cache") ? base : new CachingLLM(base, ".cache/llm");
+  const judgeProvider = values["judge-provider"] ?? process.env.JUDGE_PROVIDER;
   const judgeLLM = flags.has("judge")
-    ? createLLM({ provider: values["judge-provider"] ?? values.provider, model: values["judge-model"] ?? values.model })
+    ? createLLM({
+        provider: judgeProvider ?? values.provider,
+        // An explicitly different judge provider must not inherit the agent's model id.
+        model: values["judge-model"] ?? process.env.JUDGE_MODEL ?? (judgeProvider ? undefined : values.model),
+      })
     : undefined;
   const judge = judgeLLM ? createJudge(flags.has("no-cache") ? judgeLLM : new CachingLLM(judgeLLM, ".cache/judge")) : undefined;
 
