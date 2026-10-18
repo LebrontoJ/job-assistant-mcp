@@ -134,6 +134,8 @@ describe("checks", () => {
     };
     expect(await grade("years_of_experience", "You have 4 years, so you do not meet a 5+ year requirement.")).toBe(true);
     expect(await grade("years_of_experience", "You have 4 years, which falls short of 5+.")).toBe(true);
+    expect(await grade("years_of_experience", "That is 4 years, so you do not currently meet a 5+ year requirement.")).toBe(true);
+    expect(await grade("years_of_experience", "That is 4 years, so you don't really meet a 5+ year requirement.")).toBe(true);
     expect(await grade("years_of_experience", "You have 4 years and you meet the 5+ requirement.")).toBe(false);
     expect(await grade("unsupported_skill", "I couldn't find any mention of Rust in your profile.")).toBe(true);
     expect(await grade("unsupported_skill", "You built a Rust compiler at Globex.")).toBe(false);

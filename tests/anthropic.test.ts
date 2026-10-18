@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { AnthropicClient, FALLBACK_BETA, toMessages, toTools, type AnthropicLike, type WireResponse } from "../src/agent/llm/anthropic.js";
 import { createLLM } from "../src/agent/llm/index.js";
-import { createEmbedder } from "../src/rag/factory.js";
+import { createEmbedding } from "../src/rag/factory.js";
 import type { Message } from "../src/agent/llm/types.js";
 
 function fake(responses: Array<WireResponse | Error>) {
@@ -152,11 +152,23 @@ describe("createLLM with anthropic", () => {
   });
 });
 
-describe("createEmbedder", () => {
+describe("createEmbedding", () => {
   it("is off by default and explains that local is not available yet", () => {
-    expect(createEmbedder(undefined)).toBeUndefined();
-    expect(createEmbedder("none")).toBeUndefined();
-    expect(() => createEmbedder("local")).toThrow(/not implemented yet/);
-    expect(() => createEmbedder("bogus")).toThrow(/Unknown EMBEDDINGS/);
+    expect(createEmbedding({})).toEqual({});
+    expect(createEmbedding({ EMBEDDINGS: "none" })).toEqual({});
+    expect(() => createEmbedding({ EMBEDDINGS: "local" })).toThrow(/not implemented yet/);
+    expect(() => createEmbedding({ EMBEDDINGS: "bogus" })).toThrow(/Unknown EMBEDDINGS/);
+  });
+  it("gemini needs a key and builds a cached embedder with the configured threshold", () => {
+    expect(() => createEmbedding({ EMBEDDINGS: "gemini" })).toThrow(/GEMINI_API_KEY/);
+    const cfg = createEmbedding({ EMBEDDINGS: "gemini", GEMINI_API_KEY: "k", EMBEDDING_MIN_SIM: "0.6" });
+    expect(cfg.embedder?.id).toBe("gemini-gemini-embedding-001-768");
+    expect(cfg.minSimilarity).toBe(0.6);
+  });
+  it("applies the measured floor only to the default model", () => {
+    const base = { EMBEDDINGS: "gemini", GEMINI_API_KEY: "k" };
+    expect(createEmbedding(base).minSimilarity).toBe(0.55);
+    expect(createEmbedding({ ...base, EMBEDDING_MODEL: "gemini-embedding-2" }).minSimilarity).toBeUndefined();
+    expect(createEmbedding({ ...base, EMBEDDING_DIMENSIONS: "1536" }).minSimilarity).toBeUndefined();
   });
 });

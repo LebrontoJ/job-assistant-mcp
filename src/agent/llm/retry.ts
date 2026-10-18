@@ -1,6 +1,8 @@
 export interface RetryOptions {
   retries?: number;
   baseDelayMs?: number;
+  /** Upper bound for a server-requested wait, so a bad hint cannot stall a run forever. */
+  maxRetryAfterMs?: number;
   isRetryable?: (err: unknown) => boolean;
   sleep?: (ms: number) => Promise<void>;
 }
@@ -13,15 +15,33 @@ export function isTransient(err: unknown): boolean {
   return /ECONNRESET|ETIMEDOUT|fetch failed|RESOURCE_EXHAUSTED|UNAVAILABLE/i.test(String(err));
 }
 
+/**
+ * How long the server asked us to wait: a `retry-after` header (seconds) or the "retry in 38.09s" /
+ * `retryDelay: "38s"` hint Gemini puts in its 429 body. Undefined when there is none.
+ */
+export function retryAfterMs(err: unknown): number | undefined {
+  const e = err as { headers?: { get?: (k: string) => string | null } | Record<string, string>; message?: string } | null;
+  const h = e?.headers;
+  const header = typeof h?.get === "function" ? h.get("retry-after") : (h as Record<string, string> | undefined)?.["retry-after"];
+  const fromHeader = header ? Number(header) : NaN;
+  if (Number.isFinite(fromHeader) && fromHeader >= 0) return fromHeader * 1000;
+  const text = `${e?.message ?? ""} ${String(err)}`;
+  const m = text.match(/retry in ([\d.]+)\s*s/i) ?? text.match(/"retryDelay"\s*:\s*"([\d.]+)s"/i);
+  return m ? Math.ceil(Number(m[1]) * 1000) : undefined;
+}
+
 export async function withRetry<T>(fn: () => Promise<T>, opts: RetryOptions = {}): Promise<T> {
-  const { retries = 4, baseDelayMs = 1000, isRetryable = isTransient } = opts;
+  const { retries = 4, baseDelayMs = 1000, maxRetryAfterMs = 90_000, isRetryable = isTransient } = opts;
   const sleep = opts.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
   for (let attempt = 0; ; attempt++) {
     try {
       return await fn();
     } catch (err) {
       if (attempt >= retries || !isRetryable(err)) throw err;
-      await sleep(baseDelayMs * 2 ** attempt * (0.75 + Math.random() * 0.5));
+      const backoff = baseDelayMs * 2 ** attempt * (0.75 + Math.random() * 0.5);
+      const asked = retryAfterMs(err);
+      // Wait at least as long as the server asked (plus a second of slack), never less than our own backoff.
+      await sleep(asked === undefined ? backoff : Math.max(backoff, Math.min(asked + 1000, maxRetryAfterMs)));
     }
   }
 }

@@ -1,5 +1,10 @@
+export type EmbedKind = "query" | "document";
+
 export interface Embedder {
-  embed(texts: string[]): Promise<number[][]>;
+  /** Stable identifier (provider, model, settings), used to key on-disk caches. */
+  readonly id?: string;
+  /** One vector per input, in order. `kind` lets models that distinguish queries from documents do so. */
+  embed(texts: string[], kind?: EmbedKind): Promise<number[][]>;
 }
 
 export function cosine(a: number[], b: number[]): number {

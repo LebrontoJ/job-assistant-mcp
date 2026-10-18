@@ -1,5 +1,5 @@
 import type { CaseResult } from "./runner.js";
-import type { RetrievalSummary } from "./retrieval.js";
+import type { RankChange, RetrievalSummary } from "./retrieval.js";
 
 export interface Tally {
   passed: number;
@@ -61,7 +61,36 @@ export interface Meta {
   date: string;
 }
 
-export function formatReport(meta: Meta, results: CaseResult[], retrieval?: RetrievalSummary): string {
+export interface RetrievalReport {
+  /** Per search mode, e.g. bm25 / dense / hybrid. */
+  modes: Record<string, RetrievalSummary>;
+  /** Rank changes of each non-baseline mode against bm25. */
+  changes?: Record<string, { improved: RankChange[]; regressed: RankChange[] }>;
+  embedder?: string;
+}
+
+const rank = (r: number | null) => (r === null ? "miss" : `#${r}`);
+
+export function formatRetrieval(r: RetrievalReport): string[] {
+  const first = Object.values(r.modes)[0];
+  const out = ["## Retrieval", "", `${first?.cases ?? 0} queries${r.embedder ? ` · embedder: ${r.embedder}` : ""}`, ""];
+  out.push("| mode | recall@1 | recall@3 | recall@5 | MRR |", "|---|---|---|---|---|");
+  for (const [mode, s] of Object.entries(r.modes)) {
+    out.push(`| ${mode} | ${[1, 3, 5].map((k) => s.recallAt[k]!.toFixed(2)).join(" | ")} | ${s.mrr.toFixed(2)} |`);
+  }
+  for (const [mode, c] of Object.entries(r.changes ?? {})) {
+    const line = (x: RankChange) => `  - ${x.id}: ${rank(x.from)} -> ${rank(x.to)} ("${x.query}")`;
+    if (c.improved.length) out.push("", `${mode} improved vs bm25:`, ...c.improved.map(line));
+    if (c.regressed.length) out.push("", `${mode} regressed vs bm25:`, ...c.regressed.map(line));
+  }
+  for (const [mode, s] of Object.entries(r.modes)) {
+    if (s.misses.length) out.push("", `${mode}: no relevant chunk in top 5 for ${s.misses.join(", ")}`);
+  }
+  out.push("");
+  return out;
+}
+
+export function formatReport(meta: Meta, results: CaseResult[], retrieval?: RetrievalReport): string {
   const s = summarize(results);
   const out: string[] = [];
   out.push(`# Eval report: ${meta.provider}/${meta.model}`, "");
@@ -85,11 +114,6 @@ export function formatReport(meta: Meta, results: CaseResult[], retrieval?: Retr
       out.push("");
     }
   }
-  if (retrieval) {
-    out.push("## Retrieval", "", `${retrieval.cases} queries`, "", "| recall@1 | recall@3 | recall@5 | MRR |", "|---|---|---|---|");
-    out.push(`| ${[1, 3, 5].map((k) => retrieval.recallAt[k]!.toFixed(2)).join(" | ")} | ${retrieval.mrr.toFixed(2)} |`);
-    if (retrieval.misses.length) out.push("", `No relevant chunk found for: ${retrieval.misses.join(", ")}`);
-    out.push("");
-  }
+  if (retrieval) out.push(...formatRetrieval(retrieval));
   return out.join("\n");
 }

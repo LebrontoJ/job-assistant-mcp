@@ -26,7 +26,7 @@ The agent host (`src/agent`) connects to the server over stdio and drives any mo
 | Agent model: Gemini | `LLM_PROVIDER=gemini` | **Verified live** (free tier), baseline in [docs/EVALS.md](docs/EVALS.md) |
 | Agent model: Claude | `LLM_PROVIDER=anthropic` (default `claude-opus-5-5`) | Implemented; unit-tested and checked against the real SDK's HTTP request shape with a fake network. **Not yet run against the live API** |
 | Eval judge | `--judge-provider/--judge-model` or `JUDGE_PROVIDER/JUDGE_MODEL` | Independent of the agent model; never inherits its model id |
-| Dense retrieval | `EMBEDDINGS=none\|local` | Fusion logic tested with a fake embedder; `local` model **not implemented yet** |
+| Dense retrieval | `EMBEDDINGS=none\|gemini\|local` | **Gemini embeddings verified live** (`gemini-embedding-001`, RRF hybrid, vectors cached on disk); `local` model **not implemented yet**. On the 12-query set it fixes the one lexical miss (MRR 0.92 to 0.96); the corpus is tiny, see [docs/EVALS.md](docs/EVALS.md) |
 
 The Claude adapter replays the model's own content blocks between tool calls (thinking blocks must come back
 unchanged) and enables server-side refusal fallback by default; set `LLM_FALLBACK=off` on Bedrock/Vertex/Foundry.
@@ -34,11 +34,11 @@ unchanged) and enables server-side refusal fallback by default; set `LLM_FALLBAC
 ## Retrieval
 
 `data/sample/profile/*.md` (or `PROFILE_DIR`) is chunked by heading (`Resume > Experience > Role`), indexed with
-BM25, and optionally fused with dense vectors via reciprocal rank fusion when an `Embedder` is supplied. The
-server stays model-free: `match_resume` is a lexical coverage signal and says so in its output.
+BM25, and with `EMBEDDINGS=gemini` fused with dense vectors via reciprocal rank fusion. `search_profile` returns
+keyword coverage and semantic similarity per hit. `match_resume` is still a lexical coverage signal and says so.
 
-Known limits (these are what the eval set should measure): numeric requirements ("5+ years") are not
-computed, and paraphrases with little word overlap score `weak` until a real embedder is plugged in.
+Known limits: numeric requirements ("5+ years") are not computed, and `match_resume` does not yet use the embeddings,
+so paraphrased requirements can still score `weak`.
 
 ## Quick start
 
@@ -69,7 +69,7 @@ pnpm eval --judge              # 29-case agent suite on the configured model, wi
 ```
 
 Rule-based graders check tool choice, arguments, the write-confirmation gate, citations and number grounding; an LLM
-judge covers the rest. Gemini baseline: 27/29 cases. Details, caveats and what the failures showed: [docs/EVALS.md](docs/EVALS.md).
+judge covers the rest. Gemini baseline: 28/29 cases with either BM25 or hybrid retrieval. Details, caveats and what the failures showed: [docs/EVALS.md](docs/EVALS.md).
 
 ## Privacy
 

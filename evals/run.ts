@@ -2,11 +2,13 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { CachingLLM } from "../src/agent/llm/cache.js";
 import { createLLM } from "../src/agent/llm/index.js";
-import { ProfileIndex } from "../src/rag/index.js";
+import { createEmbedding } from "../src/rag/factory.js";
+import { ProfileIndex, type SearchMode } from "../src/rag/index.js";
+import { createEnv } from "./env.js";
 import { createJudge } from "./judge.js";
 import { loadCases, loadRetrievalCases } from "./load.js";
-import { formatReport, summarize } from "./report.js";
-import { evalRetrieval } from "./retrieval.js";
+import { formatReport, summarize, type RetrievalReport } from "./report.js";
+import { diffRanks, evalRetrieval } from "./retrieval.js";
 import { runEval } from "./runner.js";
 
 function parseArgs(argv: string[]) {
@@ -34,11 +36,23 @@ async function main() {
   const { flags, values } = parseArgs(process.argv.slice(2));
   const stamp = new Date().toISOString();
 
-  const index = await ProfileIndex.fromDir(process.env.PROFILE_DIR ?? "data/sample/profile");
-  const retrieval = await evalRetrieval(await loadRetrievalCases(), index);
+  const embedding = createEmbedding({ ...process.env, ...(values.embeddings ? { EMBEDDINGS: values.embeddings } : {}) });
+  const index = await ProfileIndex.fromDir(process.env.PROFILE_DIR ?? "data/sample/profile", embedding.embedder, {
+    minSimilarity: embedding.minSimilarity,
+  });
+  const retrievalCases = await loadRetrievalCases();
+  const modes: SearchMode[] = embedding.embedder ? ["bm25", "dense", "hybrid"] : ["bm25"];
+  const runs = Object.fromEntries(
+    await Promise.all(modes.map(async (m) => [m, await evalRetrieval(retrievalCases, index, { mode: m })] as const)),
+  );
+  const retrieval: RetrievalReport = {
+    modes: Object.fromEntries(modes.map((m) => [m, runs[m]!.summary])),
+    changes: Object.fromEntries(modes.filter((m) => m !== "bm25").map((m) => [m, diffRanks(runs.bm25!.results, runs[m]!.results)])),
+    embedder: embedding.embedder?.id,
+  };
 
   if (flags.has("retrieval-only")) {
-    console.log(formatReport({ provider: "-", model: "-", date: stamp }, [], retrieval.summary));
+    console.log(formatReport({ provider: "-", model: "-", date: stamp }, [], retrieval));
     return;
   }
 
@@ -61,6 +75,7 @@ async function main() {
 
   const results = await runEval(cases, {
     llm,
+    makeEnv: () => createEnv({ index }),
     judge,
     concurrency: values.concurrency ? Number(values.concurrency) : 2,
     maxSteps: values["max-steps"] ? Number(values["max-steps"]) : 8,
@@ -75,13 +90,13 @@ async function main() {
     cache: llm instanceof CachingLLM ? { hits: llm.hits, misses: llm.misses } : undefined,
     date: stamp,
   };
-  console.log(formatReport(meta, results, retrieval.summary));
+  console.log(formatReport(meta, results, retrieval));
 
   await mkdir("evals/results", { recursive: true });
   const name = `${stamp.replace(/[:.]/g, "-")}__${llm.provider}__${llm.model}`;
   await writeFile(
     join("evals/results", `${name}.json`),
-    JSON.stringify({ meta, summary: summarize(results), retrieval: retrieval.summary, results }, null, 2),
+    JSON.stringify({ meta, summary: summarize(results), retrieval, results }, null, 2),
   );
   console.error(`Saved evals/results/${name}.json`);
   if (results.some((r) => r.error)) process.exitCode = 2;

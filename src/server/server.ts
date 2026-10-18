@@ -127,7 +127,8 @@ export function createServer(store: ApplicationStore, profile?: ProfileIndex): M
       description:
         "Search the user's own profile documents (resume, projects, STAR stories) and return the most relevant " +
         "passages with ids to cite. Use it before claiming anything about the user's experience. " +
-        "If nothing relevant comes back, the profile does not contain it.",
+        "If nothing relevant comes back, the profile does not contain it. Results retrieved by meaning alone " +
+        "(keywordCoverage 0) are only topically close: read the passage and use it only if it actually states the fact.",
       inputSchema: {
         query: z.string().min(2).describe("What to look for, e.g. 'postgres performance' or 'led an incident'."),
         k: z.number().int().min(1).max(10).optional().describe("Number of passages. Default 5."),
@@ -144,6 +145,9 @@ export function createServer(store: ApplicationStore, profile?: ProfileIndex): M
           heading: h.chunk.heading,
           text: h.chunk.text,
           score: Number(h.score.toFixed(3)),
+          // Share of the query's words found in the passage; 0 means it was retrieved by meaning alone.
+          keywordCoverage: Number(h.coverage.toFixed(2)),
+          ...(h.similarity !== undefined ? { semanticSimilarity: Number(h.similarity.toFixed(3)) } : {}),
         })),
       });
     },

@@ -32,7 +32,7 @@ with response caching and rate-limit-aware concurrency, so the same suite compar
 ## Milestones
 
 1. **M1 skeleton** (done): MCP server, store, JD parser, LLM interface + Gemini adapter, agent loop, tests.
-2. **M2 RAG** (done): heading-aware chunking, BM25 (EN + CJK), RRF hybrid with a pluggable `Embedder`, `search_profile`, `match_resume` with chunk-id citations. The real local embedder (transformers.js) is not wired yet: it downloads a model at first use.
+2. **M2 RAG** (done): heading-aware chunking, BM25 (EN + CJK), RRF hybrid with a pluggable `Embedder`, `search_profile`, `match_resume` with chunk-id citations. Gemini embeddings are wired and measured (docs/EVALS.md); the local embedder (transformers.js) is not wired yet: it downloads a model at first use.
 3. **M3 agent flows** (done): grounding rules, MCP prompts, JD -> match -> bullets -> preview -> confirmed write verified on live Gemini.
 4. **M4 evals** (done): 29 cases, rule + LLM-judge graders, response cache, retrieval metrics, Gemini baseline (see docs/EVALS.md).
 5. **M4.5 Claude adapter**: adapter written and unit-tested (done); live run + same-suite comparison table still needs an Anthropic credential.
@@ -45,7 +45,7 @@ with response caching and rate-limit-aware concurrency, so the same suite compar
 - `--repeat N` to measure run-to-run variance; grow the case set to 30-50.
 - Judge with a stronger model than the one under test.
 
-- Plug in a local embedding model and compare BM25 vs hybrid recall@k on the eval set.
+- Local embedding model (no key needed); `match_resume` should use the embeddings too; grow the retrieval set and corpus so recall@k means something.
 - `match_resume` ignores numeric requirements (years of experience).
 
 - Verify the Gemini adapter against the live API (needs a key); confirm the free-tier model ID and quota in AI Studio.

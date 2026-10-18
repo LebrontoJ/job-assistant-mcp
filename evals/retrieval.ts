@@ -1,4 +1,4 @@
-import type { ProfileIndex } from "../src/rag/index.js";
+import type { ProfileIndex, SearchMode } from "../src/rag/index.js";
 import type { RetrievalCase } from "./types.js";
 
 export interface RetrievalResult {
@@ -17,10 +17,14 @@ export interface RetrievalSummary {
 
 export const KS = [1, 3, 5];
 
-export async function evalRetrieval(cases: RetrievalCase[], index: ProfileIndex): Promise<{ results: RetrievalResult[]; summary: RetrievalSummary }> {
+export async function evalRetrieval(
+  cases: RetrievalCase[],
+  index: ProfileIndex,
+  opts: { mode?: SearchMode } = {},
+): Promise<{ results: RetrievalResult[]; summary: RetrievalSummary }> {
   const results: RetrievalResult[] = [];
   for (const c of cases) {
-    const hits = await index.search(c.query, Math.max(...KS));
+    const hits = await index.search(c.query, Math.max(...KS), { mode: opts.mode });
     const isRelevant = (i: number) =>
       c.relevant.some((r) => hits[i]!.chunk.source === r.source && hits[i]!.chunk.heading.includes(r.heading));
     const rank = hits.findIndex((_, i) => isRelevant(i));
@@ -44,4 +48,25 @@ export async function evalRetrieval(cases: RetrievalCase[], index: ProfileIndex)
       misses: results.filter((r) => r.firstRank === null).map((r) => r.id),
     },
   };
+}
+
+export interface RankChange {
+  id: string;
+  query: string;
+  from: number | null;
+  to: number | null;
+}
+
+/** Queries whose first relevant rank differs between two runs (null = not found in the top results). */
+export function diffRanks(base: RetrievalResult[], other: RetrievalResult[]): { improved: RankChange[]; regressed: RankChange[] } {
+  const score = (r: number | null) => (r === null ? Number.POSITIVE_INFINITY : r);
+  const improved: RankChange[] = [];
+  const regressed: RankChange[] = [];
+  for (const b of base) {
+    const o = other.find((x) => x.id === b.id);
+    if (!o || score(o.firstRank) === score(b.firstRank)) continue;
+    const change = { id: b.id, query: b.query, from: b.firstRank, to: o.firstRank };
+    (score(o.firstRank) < score(b.firstRank) ? improved : regressed).push(change);
+  }
+  return { improved, regressed };
 }

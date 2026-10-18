@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { sanitizeSchema, toContents, toDeclarations } from "../src/agent/llm/gemini.js";
 import { createLLM } from "../src/agent/llm/index.js";
-import { isTransient, withRetry } from "../src/agent/llm/retry.js";
+import { isTransient, retryAfterMs, withRetry } from "../src/agent/llm/retry.js";
 
 describe("gemini adapter helpers", () => {
   it("strips schema keywords Gemini rejects, recursively", () => {
@@ -72,6 +72,37 @@ describe("retry", () => {
       withRetry(async () => { n++; throw Object.assign(new Error("x"), { status: 503 }); }, { retries: 2, sleep: noSleep }),
     ).rejects.toThrow("x");
     expect(n).toBe(3);
+  });
+
+  it("waits as long as the server asks, within a cap", async () => {
+    const waits: number[] = [];
+    const sleep = async (ms: number) => void waits.push(ms);
+    let n = 0;
+    await withRetry(
+      async () => {
+        if (++n < 3) throw Object.assign(new Error('quota. Please retry in 38.09s. {"retryDelay":"38s"}'), { status: 429 });
+      },
+      { sleep, baseDelayMs: 10 },
+    );
+    expect(waits).toEqual([39_090, 39_090]);
+
+    const capped: number[] = [];
+    let k = 0;
+    await withRetry(
+      async () => {
+        if (++k < 2) throw Object.assign(new Error("retry in 600s"), { status: 429 });
+      },
+      { sleep: async (ms) => void capped.push(ms), maxRetryAfterMs: 5000 },
+    );
+    expect(capped).toEqual([5000]);
+  });
+
+  it("reads retry hints from headers and message bodies", () => {
+    expect(retryAfterMs({ headers: { get: (k: string) => (k === "retry-after" ? "7" : null) } })).toBe(7000);
+    expect(retryAfterMs({ headers: { "retry-after": "2" } })).toBe(2000);
+    expect(retryAfterMs(new Error('{"retryDelay":"12s"}'))).toBe(12_000);
+    expect(retryAfterMs(new Error("Please retry in 38.097475802s."))).toBe(38_098);
+    expect(retryAfterMs(new Error("nothing here"))).toBeUndefined();
   });
 
   it("classifies errors", () => {
