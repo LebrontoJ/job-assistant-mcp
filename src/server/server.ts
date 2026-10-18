@@ -165,5 +165,50 @@ export function createServer(store: ApplicationStore, profile?: ProfileIndex): M
     },
   );
 
+  server.registerPrompt(
+    "tailor-resume",
+    {
+      title: "Tailor resume to a job",
+      description: "Analyse a JD against the user's profile and draft evidence-backed resume bullets.",
+      argsSchema: { jd_text: z.string().describe("The full job description text.") },
+    },
+    ({ jd_text }) => ({
+      messages: [
+        {
+          role: "user",
+          content: {
+            type: "text",
+            text:
+              "Tailor my resume to this job. Steps: parse the JD, run match_resume, search_profile for the strongest " +
+              "evidence behind each requirement, then write 3-5 resume bullets using only what those passages support, " +
+              "each ending with its source id in brackets. Finish by listing requirements the profile does not cover.\n\n" +
+              jd_text,
+          },
+        },
+      ],
+    }),
+  );
+
+  server.registerPrompt(
+    "weekly-review",
+    {
+      title: "Weekly job-search review",
+      description: "Summarise pipeline status and what needs action this week.",
+    },
+    () => ({
+      messages: [
+        {
+          role: "user",
+          content: {
+            type: "text",
+            text:
+              "Review my job search. List applications by status, then list_followups for the next 7 days and tell me " +
+              "what to do first. Do not change any data.",
+          },
+        },
+      ],
+    }),
+  );
+
   return server;
 }
