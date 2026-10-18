@@ -1,0 +1,13 @@
+node_modules
+dist
+.env
+.env.*
+!.env.example
+# real personal data never goes in the repo; only data/sample (synthetic) is tracked
+data/profile/
+data/applications.json
+.cache/
+evals/results/*
+!evals/results/.gitkeep
+*.log
+.DS_Store

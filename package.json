@@ -1,0 +1,29 @@
+{
+  "name": "job-assistant-mcp",
+  "version": "0.1.0",
+  "private": true,
+  "description": "MCP job-search assistant: tool-calling agent, lightweight RAG over your own profile, and a small eval harness.",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "server": "tsx src/server/index.ts",
+    "agent": "tsx src/agent/cli.ts",
+    "eval": "tsx evals/run.ts"
+  },
+  "dependencies": {
+    "@google/genai": "2.30.0",
+    "@modelcontextprotocol/sdk": "1.32.1",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "tsx": "4.23.15",
+    "typescript": "^5.0.2",
+    "vitest": "5.0.5"
+  }
+}

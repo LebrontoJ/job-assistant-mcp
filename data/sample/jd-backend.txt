@@ -1,0 +1,20 @@
+Senior Backend Engineer
+Company: Northwind Labs
+Location: Austin, TX (Hybrid)
+
+About the role
+Join Northwind Labs to build the services behind our logistics platform.
+
+Responsibilities:
+- Design and operate REST and gRPC services in Go and Python
+- Own data models in PostgreSQL and tune slow queries
+- Improve CI/CD pipelines and on-call tooling
+
+Requirements:
+- 5+ years of backend engineering experience
+- Strong knowledge of PostgreSQL and Redis
+- Experience with Docker and Kubernetes on AWS
+
+Nice to have:
+- Experience with Kafka
+- Exposure to LLM or RAG systems

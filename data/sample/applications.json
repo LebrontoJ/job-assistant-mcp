@@ -1,0 +1,42 @@
+[
+  {
+    "id": "a1b2c3d4",
+    "company": "Northwind Labs",
+    "role": "Backend Engineer",
+    "status": "interview",
+    "appliedDate": "2026-09-28",
+    "nextFollowUp": "2026-10-18",
+    "notes": "Recruiter screen done; technical round pending.",
+    "createdAt": "2026-09-28T10:00:00.000Z",
+    "updatedAt": "2026-10-10T09:00:00.000Z"
+  },
+  {
+    "id": "e5f6a7b8",
+    "company": "Contoso Data",
+    "role": "Data Engineer",
+    "status": "applied",
+    "appliedDate": "2026-10-05",
+    "nextFollowUp": "2026-10-12",
+    "createdAt": "2026-10-05T08:30:00.000Z",
+    "updatedAt": "2026-10-05T08:30:00.000Z"
+  },
+  {
+    "id": "c9d0e1f2",
+    "company": "Fabrikam AI",
+    "role": "ML Platform Engineer",
+    "status": "wishlist",
+    "url": "https://example.com/jobs/fabrikam-ml-platform",
+    "createdAt": "2026-10-08T12:00:00.000Z",
+    "updatedAt": "2026-10-08T12:00:00.000Z"
+  },
+  {
+    "id": "0a1b2c3d",
+    "company": "Adventure Works",
+    "role": "Software Engineer",
+    "status": "rejected",
+    "appliedDate": "2026-09-10",
+    "nextFollowUp": "2026-10-01",
+    "createdAt": "2026-09-10T08:00:00.000Z",
+    "updatedAt": "2026-09-30T08:00:00.000Z"
+  }
+]

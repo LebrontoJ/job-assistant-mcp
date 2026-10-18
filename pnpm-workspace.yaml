@@ -1,0 +1,6 @@
+# Build scripts are not needed: esbuild ships prebuilt binaries, and the Gemini
+# SDK / protobufjs postinstall steps are optional.
+allowBuilds:
+  '@google/genai': false
+  esbuild: false
+  protobufjs: false
