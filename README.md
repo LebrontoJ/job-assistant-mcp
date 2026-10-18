@@ -89,6 +89,12 @@ judge (a different model from the agent) covers the rest. Gemini baseline: 95/99
 fails every time. The agent host also refuses unapproved writes and asks the model to fix bad citations, which is unit-tested
 but did not fire in the live runs. Details, caveats and what the failures showed: [docs/EVALS.md](docs/EVALS.md).
 
+## Observability
+
+Runs can write a JSONL trace (model calls with API time, retries and tokens; tool calls with duration; host guard
+actions). `TRACE_DIR=.traces pnpm agent "..."` then `pnpm trace .traces/` prints a timeline and performance
+percentiles; eval reports include a performance section. Real example and caveats: [docs/OBSERVABILITY.md](docs/OBSERVABILITY.md).
+
 ## Demo
 
 Unedited runs against Gemini, including the model's mistakes: [docs/demo.md](docs/demo.md).
@@ -106,7 +112,7 @@ until you switch to a paid or local model.
 src/server/   MCP server (tools, JD parser, resume matching)
 src/rag/      tokenizer, heading-aware chunker, BM25, hybrid fusion
 src/store/    application tracker storage (JSON file)
-src/agent/    agent loop, CLI, llm/ (provider-neutral client + Gemini adapter)
+src/agent/    agent loop, host write gate and citation guard, tracing, CLI, llm/ (provider-neutral client, adapters, cache, limiter)
 data/sample/  synthetic resume, JD, applications
 evals/        case files, graders, runner, retrieval metrics
 tests/        vitest; the agent loop is tested against the real server with a scripted model

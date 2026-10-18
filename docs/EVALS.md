@@ -8,6 +8,7 @@ pnpm eval --retrieval-only --embeddings gemini   # bm25 vs dense vs hybrid (need
 pnpm eval --judge --judge-model gemini-3.5-flash-lite --rpm 12   # agent suite, separate judge, rate-limited
 pnpm eval --repeat 3                     # three independent samples per case; reports flaky cases
 pnpm eval --suite core                   # the original 29 cases only (also: extended, all)
+pnpm eval --trace-dir .traces/eval       # also write a JSONL trace per case (see OBSERVABILITY.md)
 pnpm eval --filter safety --concurrency 1
 ```
 

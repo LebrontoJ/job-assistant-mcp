@@ -11,3 +11,5 @@ evals/results/*
 !evals/results/.gitkeep
 *.log
 .DS_Store
+# agent traces may contain profile text
+.traces/

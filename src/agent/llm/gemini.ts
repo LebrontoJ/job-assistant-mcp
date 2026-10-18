@@ -63,15 +63,18 @@ export class GeminiClient implements LLMClient {
   }
 
   async chat(req: ChatRequest): Promise<ChatResponse> {
-    const res = await withRetry(() =>
-      this.ai.models.generateContent({
-        model: this.model,
-        contents: toContents(req.messages),
-        config: {
-          systemInstruction: req.system,
-          tools: req.tools.length ? [{ functionDeclarations: toDeclarations(req.tools) }] : undefined,
-        },
-      }),
+    let retries = 0;
+    const res = await withRetry(
+      () =>
+        this.ai.models.generateContent({
+          model: this.model,
+          contents: toContents(req.messages),
+          config: {
+            systemInstruction: req.system,
+            tools: req.tools.length ? [{ functionDeclarations: toDeclarations(req.tools) }] : undefined,
+          },
+        }),
+      { onRetry: () => retries++ },
     );
 
     const candidate = res.candidates?.[0];
@@ -99,6 +102,7 @@ export class GeminiClient implements LLMClient {
       toolCalls,
       finish,
       raw: candidate?.content,
+      ...(retries ? { retries } : {}),
       usage: {
         inputTokens: res.usageMetadata?.promptTokenCount ?? 0,
         outputTokens: res.usageMetadata?.candidatesTokenCount ?? 0,

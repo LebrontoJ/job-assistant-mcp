@@ -1,4 +1,5 @@
 import type { CaseResult } from "./runner.js";
+import { formatStats, summarizeEvents } from "../src/agent/trace.js";
 import type { RankChange, RetrievalSummary } from "./retrieval.js";
 
 export interface Tally {
@@ -166,6 +167,8 @@ export function formatReport(meta: Meta, results: CaseResult[], retrieval?: Retr
     for (const [k, t] of Object.entries(s.byCategory).sort()) out.push(row(k, t));
     out.push("", `Tokens: ${s.usage.inputTokens} in / ${s.usage.outputTokens} out · avg model calls per case: ${s.avgSteps.toFixed(1)}`);
     out.push(`Host enforcement: ${s.blockedWrites} confirmed write(s) blocked · ${s.citationRetries} citation retry(ies)`, "");
+    const events = results.flatMap((r) => r.events ?? []);
+    if (events.length) out.push(...formatStats(summarizeEvents(events)));
     const failed = results.filter((r) => !r.passed);
     if (failed.length) {
       out.push("## Failures", "");

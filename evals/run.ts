@@ -95,6 +95,7 @@ async function main() {
         judge,
         makeEnv: (c) =>
           createEnv({ applications: c.fixture?.applications, ...(c.fixture?.profile ? { profileDir: c.fixture.profile } : { index }) }),
+        traceDir: values["trace-dir"] ? join(values["trace-dir"], `run${i + 1}`) : undefined,
         concurrency: values.concurrency ? Number(values.concurrency) : 1,
         maxSteps: values["max-steps"] ? Number(values["max-steps"]) : 8,
         onResult: (r, done, total) =>

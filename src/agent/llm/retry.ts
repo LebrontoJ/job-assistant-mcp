@@ -4,6 +4,8 @@ export interface RetryOptions {
   /** Upper bound for a server-requested wait, so a bad hint cannot stall a run forever. */
   maxRetryAfterMs?: number;
   isRetryable?: (err: unknown) => boolean;
+  /** Called before each retry sleep, so callers can count retries and the time spent waiting. */
+  onRetry?: (info: { attempt: number; waitMs: number; error: unknown }) => void;
   sleep?: (ms: number) => Promise<void>;
 }
 
@@ -41,7 +43,9 @@ export async function withRetry<T>(fn: () => Promise<T>, opts: RetryOptions = {}
       const backoff = baseDelayMs * 2 ** attempt * (0.75 + Math.random() * 0.5);
       const asked = retryAfterMs(err);
       // Wait at least as long as the server asked (plus a second of slack), never less than our own backoff.
-      await sleep(asked === undefined ? backoff : Math.max(backoff, Math.min(asked + 1000, maxRetryAfterMs)));
+      const waitMs = asked === undefined ? backoff : Math.max(backoff, Math.min(asked + 1000, maxRetryAfterMs));
+      opts.onRetry?.({ attempt: attempt + 1, waitMs, error: err });
+      await sleep(waitMs);
     }
   }
 }

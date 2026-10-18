@@ -1,5 +1,6 @@
 import { AnthropicClient, type AnthropicOptions } from "./anthropic.js";
 import { GeminiClient } from "./gemini.js";
+import { TimedLLM } from "./timed.js";
 import type { LLMClient } from "./types.js";
 
 export type { LLMClient } from "./types.js";
@@ -11,6 +12,10 @@ export interface LLMConfig {
 
 /** Picks the backend from args/env so swapping models never touches the agent loop. */
 export function createLLM(cfg: LLMConfig = {}, env: NodeJS.ProcessEnv = process.env): LLMClient {
+  return new TimedLLM(createRaw(cfg, env));
+}
+
+function createRaw(cfg: LLMConfig, env: NodeJS.ProcessEnv): LLMClient {
   const canon = (p: string) => (p.toLowerCase() === "claude" ? "anthropic" : p.toLowerCase());
   const provider = canon(cfg.provider ?? env.LLM_PROVIDER ?? "gemini");
   // LLM_MODEL belongs to LLM_PROVIDER; never hand one vendor's model id to another (e.g. a Claude judge).

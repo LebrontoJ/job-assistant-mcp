@@ -3,6 +3,7 @@ import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
 import { createInterface } from "node:readline/promises";
 import { createLLM } from "./llm/index.js";
 import { runAgent } from "./loop.js";
+import { JsonlTracer } from "./trace.js";
 import type { Message } from "./llm/types.js";
 
 const shorten = (s: string, n = 140) => (s.length > n ? `${s.slice(0, n)}… (${s.length} chars)` : s);
@@ -14,6 +15,11 @@ async function main() {
     // no .env: rely on the real environment
   }
   const llm = createLLM();
+  // TRACE_DIR=.traces writes one JSONL trace per CLI session; view it with `pnpm trace <file>`.
+  const tracer = process.env.TRACE_DIR
+    ? new JsonlTracer(`${process.env.TRACE_DIR}/cli-${new Date().toISOString().replace(/[:.]/g, "-")}.jsonl`)
+    : undefined;
+  let turn = 0;
   const mcp = new Client({ name: "job-assistant-cli", version: "0.1.0" });
   await mcp.connect(
     new StdioClientTransport({
@@ -27,7 +33,7 @@ async function main() {
   const oneShot = process.argv.slice(2).join(" ").trim();
   let history: Message[] = [];
   const ask = async (text: string) => {
-    const run = await runAgent(llm, mcp, text, { history });
+    const run = await runAgent(llm, mcp, text, { history, tracer, runId: `cli-t${++turn}` });
     history = run.messages;
     for (const t of run.trace) console.error(`  [tool] ${t.name}(${shorten(JSON.stringify(t.args))})${t.isError ? " -> error" : ""}`);
     console.log(run.answer || `(no answer: ${run.stoppedBecause})`);

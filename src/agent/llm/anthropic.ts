@@ -107,10 +107,13 @@ export class AnthropicClient implements LLMClient {
     };
 
     const useFallback = this.opts.fallback ?? false;
-    const res = await withRetry(() =>
-      useFallback
-        ? this.api.beta.messages.create({ ...params, betas: [FALLBACK_BETA], fallbacks: "default" })
-        : this.api.messages.create(params),
+    let retries = 0;
+    const res = await withRetry(
+      () =>
+        useFallback
+          ? this.api.beta.messages.create({ ...params, betas: [FALLBACK_BETA], fallbacks: "default" })
+          : this.api.messages.create(params),
+      { onRetry: () => retries++ },
     );
 
     const toolCalls: ToolCall[] = res.content
@@ -127,6 +130,7 @@ export class AnthropicClient implements LLMClient {
       toolCalls,
       finish: toFinish(res.stop_reason, toolCalls.length > 0),
       raw: res.content,
+      ...(retries ? { retries } : {}),
       usage: {
         inputTokens: (u.input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0),
         outputTokens: u.output_tokens ?? 0,

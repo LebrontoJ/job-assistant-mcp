@@ -46,6 +46,10 @@ export interface ChatResponse {
   /** Why generation stopped, normalised: a refusal or truncation should not look like success. */
   finish: "stop" | "tool_calls" | "length" | "blocked" | "other";
   raw?: unknown;
+  /** API time of the call that produced this response, if measured (see TimedLLM). */
+  latencyMs?: number;
+  /** How many times the adapter retried (429/5xx) before this response; their waits are inside latencyMs. */
+  retries?: number;
 }
 
 export interface LLMClient {

@@ -1,4 +1,6 @@
 import { runAgent } from "../src/agent/loop.js";
+import { JsonlTracer, MemoryTracer, multiTracer, type TraceEvent } from "../src/agent/trace.js";
+import { join } from "node:path";
 import type { AgentRun } from "../src/agent/loop.js";
 import type { LLMClient, Message, Usage } from "../src/agent/llm/types.js";
 import { evaluateCheck, type CheckResult, type TracedCall } from "./checks.js";
@@ -23,6 +25,8 @@ export interface CaseResult {
   citationRetries: number;
   /** No real check failed, but a grader error left at least one check unevaluated. Neither pass nor fail. */
   ungraded?: boolean;
+  /** Trace events of every turn, for latency and tool statistics. */
+  events?: TraceEvent[];
   /** Set when the run itself failed (API error etc.), as opposed to a check failing. */
   error?: string;
 }
@@ -33,6 +37,8 @@ export interface RunOptions {
   maxSteps?: number;
   concurrency?: number;
   makeEnv?: (c: EvalCase) => Promise<EvalEnv>;
+  /** If set, each case's trace is also written to <traceDir>/<caseId>.jsonl. */
+  traceDir?: string;
   onResult?: (r: CaseResult, done: number, total: number) => void;
 }
 
@@ -42,6 +48,8 @@ export async function runCase(c: EvalCase, opts: RunOptions): Promise<CaseResult
     ((k: EvalCase) => createEnv({ applications: k.fixture?.applications, profileDir: k.fixture?.profile })))(c);
   const usage: Usage = { inputTokens: 0, outputTokens: 0 };
   const trace: TracedCall[] = [];
+  const memory = new MemoryTracer();
+  const tracer = multiTracer(memory, opts.traceDir ? new JsonlTracer(join(opts.traceDir, `${c.id}.jsonl`)) : undefined);
   const answers: string[] = [];
   const stops: Array<AgentRun["stoppedBecause"]> = [];
   let history: Message[] = [];
@@ -50,7 +58,7 @@ export async function runCase(c: EvalCase, opts: RunOptions): Promise<CaseResult
   let citationRetries = 0;
   try {
     for (const [turn, text] of c.turns.entries()) {
-      const run = await runAgent(opts.llm, env.client, text, { history, maxSteps: opts.maxSteps });
+      const run = await runAgent(opts.llm, env.client, text, { history, maxSteps: opts.maxSteps, tracer, runId: `${c.id}-t${turn}` });
       history = run.messages;
       trace.push(...run.trace.map((t) => ({ ...t, turn })));
       answers.push(run.answer);
@@ -83,6 +91,7 @@ export async function runCase(c: EvalCase, opts: RunOptions): Promise<CaseResult
       suite: c.suite,
       blocked,
       citationRetries,
+      events: memory.events,
       passed: checks.filter((k) => !k.skipped).every((k) => k.pass),
       ungraded: checks.some((k) => k.graderError) && checks.every((k) => k.pass || k.skipped || k.graderError),
       checks,
@@ -99,6 +108,7 @@ export async function runCase(c: EvalCase, opts: RunOptions): Promise<CaseResult
       suite: c.suite,
       blocked,
       citationRetries,
+      events: memory.events,
       passed: false,
       checks: [],
       tools: trace.map((t) => t.name),

@@ -1,6 +1,7 @@
 import type { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { citationProblem } from "./citations.js";
 import { BLOCKED_MESSAGE, checkWriteGate } from "./gate.js";
+import { clip, type Tracer } from "./trace.js";
 import type { LLMClient, Message, ToolResult, ToolSpec, Usage } from "./llm/types.js";
 
 export interface ToolTrace {
@@ -57,6 +58,10 @@ export interface RunOptions {
   writeGate?: boolean;
   /** Send the model back once when its answer cites nothing or cites unknown ids. Default true. */
   citationGuard?: boolean;
+  /** Receives one event per model call, tool call, guard action and run boundary. */
+  tracer?: Tracer;
+  /** Identifies this run in trace events. Defaults to a random id. */
+  runId?: string;
 }
 
 export async function runAgent(
@@ -65,63 +70,93 @@ export async function runAgent(
   userText: string,
   opts: RunOptions = {},
 ): Promise<AgentRun> {
-  const { maxSteps = 8, system = SYSTEM_PROMPT } = opts;
+  const { maxSteps = 8, system = SYSTEM_PROMPT, tracer } = opts;
+  const runId = opts.runId ?? Math.random().toString(36).slice(2, 10);
+  const startedAt = Date.now();
+  const now = () => new Date().toISOString();
   const tools = await listToolSpecs(mcp);
   const messages: Message[] = [...(opts.history ?? []), { role: "user", text: userText }];
   const trace: ToolTrace[] = [];
   const usage: Usage = { inputTokens: 0, outputTokens: 0 };
+  tracer?.emit({ type: "run_start", runId, ts: now(), provider: llm.provider, model: llm.model, user: clip(userText, 200) });
 
   let blockedWrites = 0;
   let citationRetries = 0;
-  const finish = (answer: string, steps: number, stoppedBecause: AgentRun["stoppedBecause"]): AgentRun => ({
-    answer, messages, trace, usage, steps, stoppedBecause, blockedWrites, citationRetries,
-  });
+  const finish = (answer: string, steps: number, stoppedBecause: AgentRun["stoppedBecause"] | "error"): AgentRun => {
+    tracer?.emit({
+      type: "run_end", runId, ts: now(), ms: Date.now() - startedAt, steps, stoppedBecause,
+      inputTokens: usage.inputTokens, outputTokens: usage.outputTokens, answerChars: answer.length,
+    });
+    return { answer, messages, trace, usage, steps, stoppedBecause: stoppedBecause as AgentRun["stoppedBecause"], blockedWrites, citationRetries };
+  };
 
-  for (let step = 1; step <= maxSteps; step++) {
-    const res = await llm.chat({ system, messages, tools });
-    usage.inputTokens += res.usage.inputTokens;
-    usage.outputTokens += res.usage.outputTokens;
-    messages.push({ role: "assistant", text: res.text, toolCalls: res.toolCalls, raw: res.raw });
+  let step = 1;
+  try {
+    for (; step <= maxSteps; step++) {
+      const res = await llm.chat({ system, messages, tools });
+      usage.inputTokens += res.usage.inputTokens;
+      usage.outputTokens += res.usage.outputTokens;
+      messages.push({ role: "assistant", text: res.text, toolCalls: res.toolCalls, raw: res.raw });
+      tracer?.emit({
+        type: "llm_call", runId, ts: now(), step, ms: res.latencyMs, ...(res.retries ? { retries: res.retries } : {}),
+        inputTokens: res.usage.inputTokens, outputTokens: res.usage.outputTokens,
+        finish: res.finish, toolCalls: res.toolCalls.map((c) => c.name),
+      });
 
-    if (res.toolCalls.length === 0) {
-      const stop = res.finish === "blocked" ? "blocked" : res.finish === "length" ? "truncated" : "answered";
-      if (stop === "answered" && opts.citationGuard !== false && citationRetries < 1 && step < maxSteps) {
-        const problem = citationProblem(res.text, messages, trace);
-        if (problem) {
-          citationRetries++;
-          messages.push({ role: "user", text: problem, synthetic: true });
-          continue;
-        }
-      }
-      return finish(res.text, step, stop);
-    }
-
-    // Independent calls from one turn run concurrently; results go back in a single message.
-    const results: ToolResult[] = await Promise.all(
-      res.toolCalls.map(async (call): Promise<ToolResult> => {
-        if (opts.writeGate !== false) {
-          const decision = checkWriteGate(messages, call);
-          if (!decision.allowed) {
-            blockedWrites++;
-            trace.push({ name: call.name, args: call.args, result: BLOCKED_MESSAGE, isError: true, blocked: true });
-            return { callId: call.id, name: call.name, text: BLOCKED_MESSAGE, isError: true };
+      if (res.toolCalls.length === 0) {
+        const stop = res.finish === "blocked" ? "blocked" : res.finish === "length" ? "truncated" : "answered";
+        if (stop === "answered" && opts.citationGuard !== false && citationRetries < 1 && step < maxSteps) {
+          const problem = citationProblem(res.text, messages, trace);
+          if (problem) {
+            citationRetries++;
+            tracer?.emit({ type: "guard", runId, ts: now(), step, kind: "citation_retry", detail: problem });
+            messages.push({ role: "user", text: problem, synthetic: true });
+            continue;
           }
         }
-        try {
-          const out = await mcp.callTool({ name: call.name, arguments: call.args });
-          const content = (out.content ?? []) as Array<{ type: string; text?: string }>;
-          const text = content.map((c) => (c.type === "text" ? c.text : `[${c.type}]`)).join("\n");
-          const isError = out.isError === true;
-          trace.push({ name: call.name, args: call.args, result: text, isError });
-          return { callId: call.id, name: call.name, text, isError };
-        } catch (err) {
-          const text = err instanceof Error ? err.message : String(err);
-          trace.push({ name: call.name, args: call.args, result: text, isError: true });
-          return { callId: call.id, name: call.name, text, isError: true };
-        }
-      }),
-    );
-    messages.push({ role: "tool", results });
+        return finish(res.text, step, stop);
+      }
+
+      // Independent calls from one turn run concurrently; results go back in a single message.
+      const results: ToolResult[] = await Promise.all(
+        res.toolCalls.map(async (call): Promise<ToolResult> => {
+          const t0 = Date.now();
+          const record = (result: string, isError: boolean, blocked?: boolean) => {
+            trace.push({ name: call.name, args: call.args, result, isError, ...(blocked ? { blocked } : {}) });
+            tracer?.emit({
+              type: "tool_call", runId, ts: now(), step, name: call.name, args: clip(JSON.stringify(call.args), 300),
+              ms: Date.now() - t0, isError, ...(blocked ? { blocked } : {}), result: clip(result, 300),
+            });
+          };
+          if (opts.writeGate !== false) {
+            const decision = checkWriteGate(messages, call);
+            if (!decision.allowed) {
+              blockedWrites++;
+              tracer?.emit({ type: "guard", runId, ts: now(), step, kind: "write_blocked", detail: `${call.name}: ${decision.reason}` });
+              record(BLOCKED_MESSAGE, true, true);
+              return { callId: call.id, name: call.name, text: BLOCKED_MESSAGE, isError: true };
+            }
+          }
+          try {
+            const out = await mcp.callTool({ name: call.name, arguments: call.args });
+            const content = (out.content ?? []) as Array<{ type: string; text?: string }>;
+            const text = content.map((c) => (c.type === "text" ? c.text : `[${c.type}]`)).join("\n");
+            const isError = out.isError === true;
+            record(text, isError);
+            return { callId: call.id, name: call.name, text, isError };
+          } catch (err) {
+            const text = err instanceof Error ? err.message : String(err);
+            record(text, true);
+            return { callId: call.id, name: call.name, text, isError: true };
+          }
+        }),
+      );
+      messages.push({ role: "tool", results });
+    }
+  } catch (err) {
+    // A model/API failure still closes the trace, so a failed run is visible instead of just ending.
+    finish("", step, "error");
+    throw err;
   }
 
   return finish("", maxSteps, "max_steps");

@@ -43,7 +43,7 @@ with response caching and rate-limit-aware concurrency, so the same suite compar
 - Run the suite on Claude (agent and, separately, judge) and publish the comparison table; until then the Claude path is untested live.
 
 - Held-out prompts for `inflate_experience`-style failures before touching the prompt; a stronger or non-Gemini judge; grow adversarial and faithfulness cases.
-- Observability (C): per-run trace files and latency/token dimensions in the eval report.
+- Observability follow-ups: OpenTelemetry export, cost estimates when running a priced model, embedding-call latency.
 
 - Local embedding model (no key needed); `match_resume` should use the embeddings too; grow the retrieval set and corpus so recall@k means something.
 - `match_resume` ignores numeric requirements (years of experience).
