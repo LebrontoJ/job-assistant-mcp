@@ -4,7 +4,7 @@ import { z } from "zod";
 import type { ProfileIndex } from "../rag/index.js";
 import { ApplicationStore, StatusSchema } from "../store/applications.js";
 import { parseJd } from "./jd.js";
-import { matchProfile } from "./match.js";
+import { matchProfile, type MatchOptions } from "./match.js";
 
 const json = (value: unknown): CallToolResult => ({
   content: [{ type: "text", text: JSON.stringify(value, null, 2) }],
@@ -23,7 +23,7 @@ const confirmField = z
   .optional()
   .describe("Must be true to actually write. Set it only after the user has explicitly approved the change.");
 
-export function createServer(store: ApplicationStore, profile?: ProfileIndex): McpServer {
+export function createServer(store: ApplicationStore, profile?: ProfileIndex, opts: { match?: MatchOptions } = {}): McpServer {
   const server = new McpServer({ name: "job-assistant", version: "0.1.0" });
 
   server.registerTool(
@@ -160,12 +160,13 @@ export function createServer(store: ApplicationStore, profile?: ProfileIndex): M
       description:
         "Compare a job description with the user's profile. For each requirement and nice-to-have it reports " +
         "whether the profile has supporting evidence (with chunk ids), and which JD skills appear or are missing. " +
-        "Read-only; the result is a retrieval signal for you to interpret, not a final verdict.",
+        "Read-only; the result is a retrieval signal for you to interpret, not a final verdict. 'weak' means a related " +
+        "passage exists, not that the requirement is met; requirements with a quantity (years) never exceed 'weak'.",
       inputSchema: { jd_text: z.string().min(20).describe("The full job description text.") },
     },
     async ({ jd_text }) => {
       if (!profile?.size) return noProfile();
-      return json(await matchProfile(parseJd(jd_text), profile));
+      return json(await matchProfile(parseJd(jd_text), profile, opts.match));
     },
   );
 

@@ -8,7 +8,8 @@ import { createEmbedding } from "../src/rag/factory.js";
 import { ProfileIndex, type SearchMode } from "../src/rag/index.js";
 import { createEnv } from "./env.js";
 import { createJudge } from "./judge.js";
-import { loadCases, loadRetrievalCases } from "./load.js";
+import { loadCases, loadMatchCases, loadRetrievalCases } from "./load.js";
+import { bySplit, collectSignals, formatMatching, formatMisses, score, sweep } from "./matching.js";
 import { formatReport, stability, summarize, type RetrievalReport } from "./report.js";
 import { diffRanks, evalRetrieval } from "./retrieval.js";
 import { runEval, type CaseResult } from "./runner.js";
@@ -52,6 +53,42 @@ async function main() {
     changes: Object.fromEntries(modes.filter((m) => m !== "bm25").map((m) => [m, diffRanks(retrievalRuns.bm25!.results, retrievalRuns[m]!.results)])),
     embedder: embedding.embedder?.id,
   };
+
+  if (flags.has("match-only")) {
+    // Requirement-matching quality: word overlap alone vs word overlap plus embedding similarity.
+    const cases = await loadMatchCases();
+    const lexicalIndex = await ProfileIndex.fromDir(process.env.PROFILE_DIR ?? "data/sample/profile");
+    const lexical = score(await collectSignals(cases, lexicalIndex));
+    const rows = [{ label: "keyword only", scored: lexical }];
+    const names = new Map(cases.map((c) => [c.id, c.item]));
+    const extra: string[] = [...formatMisses("keyword only", lexical, names)];
+    if (embedding.embedder) {
+      const signals = await collectSignals(cases, index);
+      if (flags.has("sweep")) {
+        const ranked = sweep(signals)
+          .filter((r) => r.dev.falseSupported === 0)
+          .sort((a, b) => b.dev.accuracy - a.dev.accuracy || a.dev.overreach - b.dev.overreach || b.dev.surfaced.found - a.dev.surfaced.found);
+        console.log("## Threshold sweep (dev split only; rows with 0 false `supported`)\n");
+        console.log("| high | low | dev exact | overreach | evidence shown for supported | labelled supported |\n|---|---|---|---|---|---|");
+        for (const r of ranked.slice(0, 25)) {
+          console.log(`| ${r.high} | ${r.low} | ${(100 * r.dev.accuracy).toFixed(0)}% | ${r.dev.overreach} | ${r.dev.surfaced.found}/${r.dev.surfaced.total} | ${r.dev.recognised.found}/${r.dev.recognised.total} |`);
+        }
+        console.log(`\n${ranked.length} of the grid's settings had no false 'supported' on dev.\n`);
+      }
+      const high = Number(values["match-high"] ?? embedding.matchSemantic?.high);
+      const low = Number(values["match-low"] ?? embedding.matchSemantic?.low);
+      if (Number.isFinite(high) && Number.isFinite(low)) {
+        const semantic = score(signals, { high, low });
+        rows.push({ label: `with embeddings (high ${high}, low ${low})`, scored: semantic });
+        extra.push(...formatMisses(`with embeddings (high ${high}, low ${low})`, semantic, names));
+      } else {
+        console.error("No thresholds: pass --match-high and --match-low (or run with --sweep to choose them on dev).");
+      }
+    }
+    console.log(formatMatching(rows).join("\n"));
+    console.log(extra.join("\n"));
+    return;
+  }
 
   if (flags.has("retrieval-only")) {
     console.log(formatReport({ provider: "-", model: "-", date: stamp }, [], retrieval));

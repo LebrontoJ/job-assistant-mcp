@@ -9,7 +9,7 @@ const file = resolve(process.env.APPLICATIONS_FILE ?? "data/sample/applications.
 const profileDir = resolve(process.env.PROFILE_DIR ?? "data/sample/profile");
 const embedding = createEmbedding();
 const profile = await ProfileIndex.fromDir(profileDir, embedding.embedder, { minSimilarity: embedding.minSimilarity });
-const server = createServer(new ApplicationStore(file), profile);
+const server = createServer(new ApplicationStore(file), profile, { match: { semantic: embedding.matchSemantic } });
 
 // stdout carries the MCP protocol; anything human-readable must go to stderr.
 await server.connect(new StdioServerTransport());

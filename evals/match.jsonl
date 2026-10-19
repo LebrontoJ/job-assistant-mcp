@@ -1,0 +1,28 @@
+{"id": "s_pg_redis", "item": "Strong knowledge of PostgreSQL and Redis", "truth": "supported", "split": "dev", "note": "both named in the profile"}
+{"id": "s_rag_paraphrase", "item": "Built retrieval-augmented generation systems", "truth": "supported", "split": "dev", "note": "profile says 'RAG assistant' with embeddings and a hybrid ranker"}
+{"id": "s_db_perf", "item": "Optimised database query performance", "truth": "supported", "split": "dev", "note": "p95 latency cut via index and query redesign"}
+{"id": "s_ci_speed", "item": "Improved CI/CD pipeline speed", "truth": "supported", "split": "dev", "note": "release time 40 -> 12 minutes"}
+{"id": "s_cache_latency", "item": "Caching strategies to reduce API latency", "truth": "supported", "split": "dev", "note": "Redis caching halved API latency"}
+{"id": "s_go", "item": "Experience with Go", "truth": "supported", "split": "dev", "note": "Kafka consumer written in Go"}
+{"id": "s_docker_k8s_aws", "item": "Experience with Docker and Kubernetes on AWS", "truth": "supported", "split": "test"}
+{"id": "s_kafka_consumers", "item": "Experience building event-driven consumers with Kafka", "truth": "supported", "split": "test"}
+{"id": "s_eval_suites", "item": "Designed evaluation suites to measure LLM answer quality", "truth": "supported", "split": "test", "note": "60-question eval set, faithfulness 71% -> 88%"}
+{"id": "s_incident_runbooks", "item": "Led incident response and wrote runbooks", "truth": "supported", "split": "test"}
+{"id": "s_terraform_iac", "item": "Infrastructure as code with Terraform", "truth": "supported", "split": "test"}
+{"id": "s_python_services", "item": "Build and operate Python web services at scale", "truth": "supported", "split": "test", "note": "FastAPI services, 2M requests/day"}
+{"id": "w_years", "item": "5+ years of backend engineering experience", "truth": "weak", "split": "dev", "note": "profile dates give 4 years; a quantity"}
+{"id": "w_rest", "item": "Experience with REST APIs", "truth": "weak", "split": "dev", "note": "FastAPI services, but REST is never stated"}
+{"id": "w_ml_prod", "item": "Experience deploying machine learning models to production", "truth": "weak", "split": "dev", "note": "embeddings in a RAG assistant, no model deployment stated"}
+{"id": "w_leadership", "item": "Leadership experience managing a team", "truth": "weak", "split": "test", "note": "led an incident, never managed a team"}
+{"id": "w_distributed", "item": "Experience with distributed systems", "truth": "weak", "split": "test", "note": "Kafka and Kubernetes are related; the term is not claimed"}
+{"id": "w_pg_scaling", "item": "Experience with PostgreSQL replication and sharding", "truth": "weak", "split": "test", "note": "PostgreSQL work, but not replication or sharding"}
+{"id": "n_rust", "item": "Experience with Rust", "truth": "no_evidence", "split": "dev"}
+{"id": "n_mobile", "item": "Mobile app development for iOS or Android", "truth": "no_evidence", "split": "dev"}
+{"id": "n_graphql", "item": "Experience with GraphQL", "truth": "no_evidence", "split": "dev", "note": "API-adjacent but absent"}
+{"id": "n_warehouse", "item": "Experience with data warehousing such as Snowflake or BigQuery", "truth": "no_evidence", "split": "dev", "note": "database-adjacent but absent"}
+{"id": "n_ml_training", "item": "Machine learning model training and fine-tuning", "truth": "no_evidence", "split": "dev", "note": "hard negative: close to the RAG assistant semantically"}
+{"id": "n_haskell", "item": "Deep expertise in Haskell compilers", "truth": "no_evidence", "split": "test"}
+{"id": "n_react", "item": "Frontend development with React", "truth": "no_evidence", "split": "test"}
+{"id": "n_clearance", "item": "Active security clearance", "truth": "no_evidence", "split": "test"}
+{"id": "n_kotlin", "item": "Proficiency in Kotlin", "truth": "no_evidence", "split": "test"}
+{"id": "n_spark_airflow", "item": "Experience with Spark and Airflow data pipelines", "truth": "no_evidence", "split": "test", "note": "hard negative: close to the Kafka pipeline"}

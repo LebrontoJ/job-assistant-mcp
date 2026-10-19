@@ -16,7 +16,7 @@ your own profile, and a small eval harness that tells you whether a change made 
 | `list_applications` | read | Filter by status / company. |
 | `list_followups` | read | Open applications with a follow-up due in N days (overdue included). |
 | `search_profile` | read | BM25 search over your Markdown profile; returns passages with citable chunk ids. Works for English and Chinese. |
-| `match_resume` | read | Compares a JD to the profile: per requirement `supported` / `weak` / `no_evidence` with evidence ids, plus which JD skills are present or missing. |
+| `match_resume` | read | Compares a JD to the profile: per requirement `supported` / `weak` / `no_evidence` with evidence ids and how each was matched (keyword / semantic), plus which JD skills are present or missing. |
 | `add_application` | **write** | Returns a preview unless `confirm=true`; refuses duplicates. |
 | `update_application` | **write** | Same confirm gate; unknown ids return an error the model can recover from. |
 
@@ -50,10 +50,13 @@ unchanged) and enables server-side refusal fallback by default; set `LLM_FALLBAC
 
 `data/sample/profile/*.md` (or `PROFILE_DIR`) is chunked by heading (`Resume > Experience > Role`), indexed with
 BM25, and with `EMBEDDINGS=gemini` fused with dense vectors via reciprocal rank fusion. `search_profile` returns
-keyword coverage and semantic similarity per hit. `match_resume` is still a lexical coverage signal and says so.
+keyword coverage and semantic similarity per hit. `match_resume` combines word overlap with embedding similarity, but
+similarity can only add `weak` evidence (never `supported` on its own), and quantities such as "5+ years" never
+exceed `weak`.
 
-Known limits: numeric requirements ("5+ years") are not computed, and `match_resume` does not yet use the embeddings,
-so paraphrased requirements can still score `weak`.
+Known limits: numeric requirements ("5+ years") are flagged, not computed. On the hand-labelled set, embeddings improved
+requirement matching from 71% to 79% (two related passages surfaced) but recognised no extra `supported` paraphrase,
+because correct and wrong matches have overlapping similarity; details in [docs/EVALS.md](docs/EVALS.md).
 
 ## Quick start
 

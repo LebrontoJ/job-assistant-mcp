@@ -22,6 +22,9 @@ export interface Hit {
   similarity?: number;
   /** Share of the query's distinct terms present in the chunk (0-1). */
   coverage: number;
+  /** How many distinct query terms the chunk contains, out of `terms`. */
+  matched: number;
+  terms: number;
 }
 
 export class ProfileIndex {
@@ -111,6 +114,8 @@ export class ProfileIndex {
         score: scores.get(index) ?? 0,
         similarity: sims.get(index),
         coverage: covered / terms.size,
+        matched: covered,
+        terms: terms.size,
       };
     });
   }

@@ -45,8 +45,9 @@ with response caching and rate-limit-aware concurrency, so the same suite compar
 - Held-out prompts for `inflate_experience`-style failures before touching the prompt; a stronger or non-Gemini judge; grow adversarial and faithfulness cases.
 - Observability follow-ups: OpenTelemetry export, cost estimates when running a priced model, embedding-call latency.
 
-- Local embedding model (no key needed); `match_resume` should use the embeddings too; grow the retrieval set and corpus so recall@k means something.
-- `match_resume` ignores numeric requirements (years of experience).
+- Local embedding model (no key needed); grow the retrieval and match sets and the corpus so recall@k and the match numbers mean something.
+- `match_resume` flags quantities (years) but does not compute them; a date parser over the profile could.
+- Recognising paraphrased `supported` requirements needs more than cosine similarity (a reranker or an LLM check over the retrieved passage, measured on the same labelled set).
 
 - Verify the Gemini adapter against the live API (needs a key); confirm the free-tier model ID and quota in AI Studio.
 - Pensum JSON compatibility for the tracker store.

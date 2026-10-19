@@ -58,3 +58,15 @@ export const RetrievalCaseSchema = z.object({
   note: z.string().optional(),
 });
 export type RetrievalCase = z.infer<typeof RetrievalCaseSchema>;
+
+/** A requirement with a hand-assigned label, judged from the synthetic profile. */
+export const MatchCaseSchema = z.object({
+  id: z.string(),
+  item: z.string(),
+  /** supported: the profile states it. weak: related but not stated (or an unverifiable quantity). no_evidence: absent. */
+  truth: z.enum(["supported", "weak", "no_evidence"]),
+  /** Thresholds are chosen on `dev` and reported on `test`, so the test numbers are not tuned. */
+  split: z.enum(["dev", "test"]),
+  note: z.string().optional(),
+});
+export type MatchCase = z.infer<typeof MatchCaseSchema>;

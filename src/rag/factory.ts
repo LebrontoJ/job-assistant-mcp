@@ -9,8 +9,18 @@ import { GeminiEmbedder } from "./gemini-embedder.js";
  */
 export const DEFAULT_MIN_SIMILARITY = 0.55;
 
+/**
+ * Thresholds for match_resume, chosen on the dev split of evals/match.jsonl for the default model only. `low` was the
+ * one setting that helped on dev (0.65); `high` made no difference there, so it is set conservatively. Measured on the
+ * held-out test split, similarity added 'weak' evidence for two related requirements and recognised no extra
+ * 'supported' ones, because correct paraphrases (0.60-0.68) and a wrong match (0.648) overlap.
+ */
+export const DEFAULT_MATCH_SEMANTIC = { high: 0.75, low: 0.65 };
+
 export interface EmbeddingConfig {
   embedder?: Embedder;
+  /** Thresholds `match_resume` uses for the embedding signal; unset until measured for the model in use. */
+  matchSemantic?: { high: number; low: number };
   /** Passed to ProfileIndex so hybrid search does not return unrelated chunks. */
   minSimilarity?: number;
 }
@@ -42,6 +52,12 @@ export function createEmbedding(env: NodeJS.ProcessEnv = process.env): Embedding
           : usesDefaultModel
             ? DEFAULT_MIN_SIMILARITY
             : undefined,
+        matchSemantic:
+          env.EMBEDDING_MATCH_HIGH && env.EMBEDDING_MATCH_LOW
+            ? { high: Number(env.EMBEDDING_MATCH_HIGH), low: Number(env.EMBEDDING_MATCH_LOW) }
+            : usesDefaultModel
+              ? DEFAULT_MATCH_SEMANTIC
+              : undefined,
       };
     }
     case "local":

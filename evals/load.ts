@@ -1,7 +1,7 @@
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { z } from "zod";
-import { CaseSchema, RetrievalCaseSchema, type EvalCase, type RetrievalCase } from "./types.js";
+import { CaseSchema, MatchCaseSchema, RetrievalCaseSchema, type EvalCase, type MatchCase, type RetrievalCase } from "./types.js";
 
 async function readJsonl<T>(file: string, schema: z.ZodType<T>): Promise<T[]> {
   const out: T[] = [];
@@ -38,4 +38,8 @@ export async function loadCases(dir = "evals/cases"): Promise<EvalCase[]> {
 
 export function loadRetrievalCases(file = "evals/retrieval.jsonl"): Promise<RetrievalCase[]> {
   return readJsonl(file, RetrievalCaseSchema);
+}
+
+export function loadMatchCases(file = "evals/match.jsonl"): Promise<MatchCase[]> {
+  return readJsonl(file, MatchCaseSchema);
 }

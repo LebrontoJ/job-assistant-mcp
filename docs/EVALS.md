@@ -8,6 +8,7 @@ pnpm eval --retrieval-only --embeddings gemini   # bm25 vs dense vs hybrid (need
 pnpm eval --judge --judge-model gemini-3.5-flash-lite --rpm 12   # agent suite, separate judge, rate-limited
 pnpm eval --repeat 3                     # three independent samples per case; reports flaky cases
 pnpm eval --suite core                   # the original 29 cases only (also: extended, all)
+pnpm eval --match-only --embeddings gemini --sweep   # requirement-matching quality (see below)
 pnpm eval --trace-dir .traces/eval       # also write a JSONL trace per case (see OBSERVABILITY.md)
 pnpm eval --filter safety --concurrency 1
 ```
@@ -136,8 +137,54 @@ separates relevant from unrelated.** Hybrid search therefore:
   system prompt say a topically related passage is not evidence unless it states the fact;
 - is guarded end to end by the `unsupported_skill` case (no Rust in the profile), which passes under hybrid retrieval.
 
-`match_resume` still scores support by keyword coverage only, so paraphrased requirements are not yet upgraded by
-the embeddings.
+## Requirement matching (`match_resume`)
+
+`evals/match.jsonl` has 28 requirements I labelled by hand against the synthetic profile: 12 `supported` (stated,
+some in other words), 6 `weak` (related but not stated, or a quantity), 10 `no_evidence` (absent, including hard
+negatives such as "model fine-tuning" next to the RAG assistant). Half are `dev`, half `test`, balanced by class.
+Thresholds were chosen on `dev` and the `test` half was scored once at the chosen setting.
+
+```bash
+pnpm eval --match-only                                   # keyword-only matching, no key
+pnpm eval --match-only --embeddings gemini --sweep       # grid of thresholds, dev split only
+pnpm eval --match-only --embeddings gemini --match-high 0.75 --match-low 0.65
+```
+
+| mode | split | exact | false `supported` | overreach | evidence shown for supported | labelled `supported` |
+|---|---|---|---|---|---|---|
+| keyword only | dev | 86% | 0 | 0 | 6/6 | 5/6 |
+| keyword only | test | 57% | 0 | 1 | 6/6 | 2/6 |
+| keyword only | all 28 | 71% | 0 | 1 | 12/12 | 7/12 |
+| with embeddings (0.75 / 0.65) | dev | 93% | 0 | 0 | 6/6 | 5/6 |
+| with embeddings (0.75 / 0.65) | test | 64% | 0 | 1 | 6/6 | 2/6 |
+| with embeddings (0.75 / 0.65) | all 28 | **79%** | 0 | 1 | 12/12 | **7/12** |
+
+*False `supported`* = said "supported" where the profile does not state it (the error that matters most).
+*Overreach* = showed evidence for something the profile does not contain.
+
+What changed, and what did not:
+
+- **Embeddings added two correct `weak` verdicts** (`w_ml_prod`, `w_distributed`: related passages that keyword
+  overlap missed entirely). That is the whole gain: 71% to 79%, two items of 28.
+- **They did not recognise any extra `supported` requirement** (7/12 before and after). The correctly matched
+  paraphrases have similarity 0.60-0.68; the one wrong match that has some word overlap ("Spark and Airflow", absent from
+  the profile) scores 0.648. No threshold separates them, so similarity cannot be allowed to decide `supported`.
+  Lowering `high` enough to recognise the paraphrases would also have promoted that wrong match; I did not do that,
+  because it would have meant tuning on the test split.
+- **The semantic rule is deliberately one-directional.** Similarity alone can add `weak`; it can lift `weak` to
+  `supported` only when at least two query words also match; and a requirement containing a quantity ("5+ years")
+  never exceeds `weak`. On the sample JD, "5+ years of backend engineering experience" has similarity 0.735 against a
+  4-year profile, which is why similarity must not decide.
+- **The labelling surfaced a bug in the keyword rule itself.** "Experience with REST APIs" was `supported` (coverage
+  0.5) because the generic word "api" matched an "API latency" passage. The rule now requires at least two matched
+  words when the requirement has two or more. This fixed the only false `supported` and did not change the test
+  split. (Fixing it was independent of the embeddings; it is why the keyword-only row shows 0 false `supported`.)
+- `high` made no difference on `dev` (its only possible beneficiary there has a single matching word), so 0.75 is a
+  conservative guess, not a measured optimum. `low = 0.65` was the one dev-optimal setting.
+
+Limits: 28 hand-labelled items on a 5-chunk synthetic profile, labelled by the author, so the `weak` boundary is
+partly a judgement call. A difference of one item is 3.5 points. Treat this as evidence of direction and of the
+failure modes, not as a measured accuracy.
 
 ## Free-tier limits we hit
 
