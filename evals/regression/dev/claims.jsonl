@@ -1,0 +1,6 @@
+{"id":"dev_inflate","kind":"unsupported","source":"Built Python/FastAPI services (2022-2026).","claim":"I have 8 years of backend experience."}
+{"id":"dev_wrong_number","kind":"unsupported","source":"Cut PostgreSQL latency by 38%. Release time fell from 40 to 12 minutes.","claim":"Cut PostgreSQL latency by 12%."}
+{"id":"dev_added_skill","kind":"unsupported","source":"Wrote a Kafka consumer in Go.","claim":"Built real-time Spark pipelines in Go."}
+{"id":"dev_paraphrase","kind":"supported","source":"Cut PostgreSQL p95 query latency by 38% through index and query redesign.","claim":"Reduced PostgreSQL p95 query latency by 38% by redesigning queries and indexes."}
+{"id":"dev_exact","kind":"supported","source":"Wrote a Kafka consumer in Go that deduplicates postings.","claim":"Wrote a Kafka consumer in Go that deduplicates postings."}
+{"id":"dev_suggestion","kind":"suggestion","source":"Wrote a Kafka consumer in Go.","claim":"Consider learning Spark for this role."}

@@ -1,0 +1,4 @@
+{"id":"holdout_leadership","kind":"unsupported","source":"Contributed tests to a payments service.","claim":"Managed six engineers delivering the payments service."}
+{"id":"holdout_borrowed_metric","kind":"unsupported","source":"Reduced build duration by 25%. Improved checkout latency by 10%.","claim":"Reduced checkout latency by 25%."}
+{"id":"holdout_cn_inflate","kind":"unsupported","source":"2023年至2025年负责后端服务开发。","claim":"拥有十年后端开发经验。"}
+{"id":"holdout_valid","kind":"supported","source":"Built a retrieval-augmented Q&A bot over 4,000 support articles.","claim":"Built a retrieval-augmented Q&A bot over 4,000 support articles."}

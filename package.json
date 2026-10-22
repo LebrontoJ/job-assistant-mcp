@@ -17,7 +17,8 @@
     "agent": "tsx src/agent/cli.ts",
     "eval": "tsx evals/run.ts",
     "eval:retrieval": "tsx evals/run.ts --retrieval-only",
-    "trace": "tsx src/agent/trace-cli.ts"
+    "trace": "tsx src/agent/trace-cli.ts",
+    "eval:freeze": "tsx scripts/freeze-baseline.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.135.0",
