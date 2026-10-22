@@ -1,0 +1,35 @@
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
+import { resolve } from 'node:path';
+import { randomUUID } from 'node:crypto';
+import { createServer } from '../server/server.js';
+import { ApplicationStore } from '../store/applications.js';
+import { ProfileIndex } from '../rag/index.js';
+import { createEmbedding } from '../rag/factory.js';
+import { tracedEmbedder } from '../rag/traced-embedder.js';
+import { createLLM } from '../agent/llm/index.js';
+import { contextualTracer, JsonlTracer, traceStage } from '../agent/trace.js';
+import { ExecutionBudget } from '../agent/execution.js';
+import { createApp } from './server.js';
+try { process.loadEnvFile('.env'); } catch { /* Environment variables are also supported. */ }
+const mode = process.env.APP_MODE ?? 'extractive';
+if (!['extractive', 'live'].includes(mode)) throw new Error('APP_MODE must be extractive or live.');
+const tracer = new JsonlTracer(resolve(process.env.TRACE_DIR ?? '.traces/app', `${randomUUID()}.jsonl`));
+const startupId = randomUUID();
+const startupTracer = contextualTracer(tracer, startupId);
+const embedding = mode === 'live' ? createEmbedding() : {};
+const profile = await traceStage(startupTracer, startupId, 'profile.index', () => new ExecutionBudget(60_000).run('profile.index', 60_000, () => ProfileIndex.fromDir(resolve(process.env.PROFILE_DIR ?? 'data/sample/profile'), tracedEmbedder(embedding.embedder, startupTracer, startupId), { minSimilarity: embedding.minSimilarity })));
+const store = new ApplicationStore(resolve(process.env.APPLICATIONS_FILE ?? 'data/sample/applications.json'));
+const mcpServer = createServer(store, profile, { match: { semantic: embedding.matchSemantic } });
+const client = new Client({ name: 'job-assistant-app', version: '0.2.0' });
+const [a, b] = InMemoryTransport.createLinkedPair();
+await traceStage(startupTracer, startupId, 'mcp.connect', () => Promise.all([mcpServer.connect(a), client.connect(b)]));
+const app = createApp({ client, store, llm: mode === 'live' ? createLLM() : undefined, tracer });
+const port = Number(process.env.PORT ?? 3210);
+if (!Number.isInteger(port) || port < 0 || port > 65535) throw new Error('Invalid PORT.');
+app.on('error', async error => { console.error(error.message); await client.close(); process.exitCode = 1; });
+app.listen(port, '127.0.0.1', () => {
+  const address = app.address();
+  console.log(`Job Assistant (${mode}) http://127.0.0.1:${typeof address === 'object' && address ? address.port : port}`);
+});
+for (const signal of ['SIGINT', 'SIGTERM'] as const) process.on(signal, () => { app.close(); app.closeAllConnections(); void client.close(); });

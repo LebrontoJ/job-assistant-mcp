@@ -29,14 +29,16 @@ export class ExecutionBudget {
     if (ms <= 0) throw new ExecutionError('timeout', `${label}: task budget exhausted`);
     const controller = new AbortController();
     let timer: ReturnType<typeof setTimeout> | undefined;
+    let interruption: ExecutionError | undefined;
     let rejectAbort: (reason: unknown) => void = () => {};
-    const abort = () => { controller.abort(); rejectAbort(new ExecutionError('cancelled', `${label}: cancelled`)); };
+    const abort = () => { interruption = new ExecutionError('cancelled', `${label}: cancelled`); controller.abort(interruption); rejectAbort(interruption); };
     const interrupted = new Promise<never>((_, reject) => {
       rejectAbort = reject;
-      timer = setTimeout(() => { controller.abort(); reject(new ExecutionError('timeout', `${label}: timed out after ${ms}ms`)); }, ms);
+      timer = setTimeout(() => { interruption = new ExecutionError('timeout', `${label}: timed out after ${ms}ms`); controller.abort(interruption); reject(interruption); }, ms);
       this.signal?.addEventListener('abort', abort, { once: true });
     });
     try { return await Promise.race([Promise.resolve().then(() => fn(controller.signal)), interrupted]); }
+    catch (error) { throw interruption ?? error; }
     finally { clearTimeout(timer); this.signal?.removeEventListener('abort', abort); }
   }
 }

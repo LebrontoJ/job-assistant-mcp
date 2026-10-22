@@ -123,8 +123,13 @@ export class ApplicationStore {
       return op;
     }));
   }
-  async cancelOperation(id: string): Promise<void> {
-    this.use(db => this.transaction(db, () => { db.prepare('UPDATE operations SET cancelled=1 WHERE id=? AND result IS NULL').run(id); }));
+  async cancelOperation(id: string): Promise<boolean> {
+    return this.use(db => this.transaction(db, () => {
+      const row = db.prepare("SELECT result FROM operations WHERE id=?").get(id);
+      if (!row || row.result) return false;
+      db.prepare("UPDATE operations SET cancelled=1 WHERE id=? AND result IS NULL").run(id);
+      return true;
+    }));
   }
   async executeOperation(id: string, tool: string, args: Record<string, unknown>): Promise<Record<string, unknown>> {
     return this.use(db => this.transaction(db, () => {

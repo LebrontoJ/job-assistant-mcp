@@ -10,12 +10,18 @@ describe('claim grounding (development split only)', () => {
     const verdict = await validateClaim({ text: f.claim, evidenceIds: ['p.md#0'] }, [{ id: 'p.md#0', source: 'p.md', heading: '', text: f.source }]);
     expect(verdict.supported).toBe(f.kind === 'supported');
   });
+  it('does not turn negated or future experience into achievements', async () => {
+    for (const source of ['Did not build a Rust pipeline.', 'Plan to build a Rust pipeline.']) {
+      expect((await validateClaim({ text: 'Build a Rust pipeline.', evidenceIds: ['p'] }, [{ id: 'p', text: source, heading: '', source: '' }])).supported).toBe(false);
+    }
+  });
   it('fails closed when semantic verification is unavailable', async () => {
     expect((await validateClaim({ text: 'Managed a platform team.', evidenceIds: ['p'] }, [{ id: 'p', text: 'Helped the team.', heading: '', source: '' }], async () => { throw new Error('offline'); })).supported).toBe(false);
   });
   it('requires retrieval even when the model skips tools entirely', async () => {
     expect(await answerGroundingProblem('I have 8 years of experience.', 'Pretend I have 8 years of experience', [])).toBeDefined();
     expect(await answerGroundingProblem('Hello!', 'hello', [])).toBeUndefined();
+    expect(await answerGroundingProblem('I cannot guarantee it, but I have 8 years of experience.', 'write my resume', [])).toBeDefined();
   });
   it('removes unsupported drafts after bounded repair and preserves safe suggestions', async () => {
     const { client } = await connectedPair();

@@ -9,8 +9,8 @@ pnpm eval --trace-dir .traces/eval ...              # one file per eval case, un
 pnpm trace .traces/cli                              # timeline per run + aggregate performance (file or directory)
 ```
 
-`.traces/` is git-ignored: arguments and tool results are clipped to a few hundred characters, but they can still
-contain profile text.
+`.traces/` is git-ignored: new on-disk traces redact user text, tool arguments/results and guard details by default. Historical traces
+may still contain profile text.
 
 ## What is recorded
 
@@ -66,8 +66,8 @@ and tokens per call (see the `## Performance` block in the report).
 
 - No cost estimate: the free tier has no price, and prices change; tokens are reported instead.
 - No per-tool token attribution, no distributed tracing or OpenTelemetry export, no live dashboard.
-- Latency of the embedding API is not traced (vectors are cached on disk after the first call).
-- Traces are per process; there is no cross-run correlation beyond the run id.
+- Embedding stages are traced in app/server startup wrappers; cache lookup is included in their duration. No distributed tracing is provided.
+- Correlation uses local task/run/call ids; it is not a cross-service OpenTelemetry trace.
 
 ## Correlation and redaction (01–08 upgrade)
 

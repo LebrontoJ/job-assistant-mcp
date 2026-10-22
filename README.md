@@ -5,8 +5,10 @@
 An MCP job-search assistant: a tool-calling agent over an MCP server, a lightweight RAG layer over
 your own profile, and a small eval harness that tells you whether a change made things better.
 
-> Status: **M4 (evals)**. MCP server, provider-neutral agent loop, profile retrieval and an eval harness work end to end;
-> a Gemini baseline is recorded in [docs/EVALS.md](docs/EVALS.md). Roadmap: [docs/PLAN.md](docs/PLAN.md).
+> Status: **01–08 implemented**: local JD-to-board app, structured evidence reports, bounded claim repair,
+> exact human approval, transactional/idempotent storage and correlated redacted traces.
+> [Run the app](docs/APP.md) · [Implementation and checks](docs/IMPLEMENTATION.md) · [Next steps](docs/PLAN.md).
+> Live scores in [docs/EVALS.md](docs/EVALS.md) are historical; no fresh live improvement claim is made for this upgrade.
 
 ## What works today
 
@@ -22,14 +24,19 @@ your own profile, and a small eval harness that tells you whether a change made 
 
 ### About the application tracker
 
-`add_application`, `update_application`, `list_applications` and `list_followups` work on a plain JSON file
-(`APPLICATIONS_FILE`, default `data/sample/applications.json`): a status-tracked list of applications with follow-up
-dates, not a visual kanban board. There is no export tool, and the file format is not yet compatible with the
-[Pensum](https://github.com/LebrontoJ/Pensum) board's import/export format (planned, see
-[docs/PLAN.md](docs/PLAN.md)). Writes are previews until `confirm=true` is passed. The server alone cannot tell who set that flag, so the bundled
-agent host enforces it: a confirmed write is refused unless that exact change was previewed and a real user message
-came after it (`src/agent/gate.ts`). Other MCP clients get only the preview step. The gate proves a human turn happened,
-not that the answer was yes.
+`pnpm app` opens a local visual kanban with JD analysis, source passages and resume suggestions.
+The default mode is an offline source-extract demo; `APP_MODE=live pnpm app` enables model drafting and verification.
+See [docs/APP.md](docs/APP.md) for the full walkthrough.
+
+The tracker uses Node 24's built-in SQLite. `APPLICATIONS_FILE` ending in `.json` is imported once into a sibling
+`.json.sqlite`; the source JSON is preserved. Application changes and operation outcomes commit together, so a
+retried confirmed write returns the original result. Updates detect changes since preview using integer versions.
+
+Write tools preview first and require the same operation id and exact payload on confirmation. The bundled host
+requires explicit approval after the preview (CLI: `yes` for one pending change, or `/approve <operationId>`;
+web: a dedicated confirm button). Cancellation, ambiguous replies, expired previews and changed payloads are rejected.
+Other MCP clients must obtain human approval themselves; the server verifies operation integrity, not human intent.
+Pensum import/export compatibility remains future work. [Storage details](docs/STORAGE.md).
 
 ### Models and retrieval seams
 
@@ -61,7 +68,9 @@ because correct and wrong matches have overlapping similarity; details in [docs/
 ## Quick start
 
 ```bash
+node --version           # Node 24+ required (built-in SQLite)
 pnpm install
+pnpm app                 # offline local app, no key needed
 cp .env.example .env     # add GEMINI_API_KEY (from Google AI Studio)
 pnpm test                # no API key needed
 pnpm agent "Which applications need a follow-up this week?"
@@ -88,9 +97,7 @@ pnpm eval --judge --judge-model gemini-3.5-flash-lite --repeat 3 --rpm 12
 ```
 
 Rule-based graders check tool choice, arguments, the write-confirmation gate, citations and number grounding; an LLM
-judge (a different model from the agent) covers the rest. Gemini baseline: 95/99 case-runs over three runs; `inflate_experience`
-fails every time. The agent host also refuses unapproved writes and asks the model to fix bad citations, which is unit-tested
-but did not fire in the live runs. Details, caveats and what the failures showed: [docs/EVALS.md](docs/EVALS.md).
+judge (a different model from the agent) covers the rest. Historical Gemini baseline: 95/99 case-runs over three runs; `inflate_experience` failed every time before the current runtime checks. The historical live runs preceded the 01–08 upgrade. Current host guards are covered by deterministic regression and fault-injection tests; no new live suite has been run for this upgrade. Details, caveats and what the failures showed: [docs/EVALS.md](docs/EVALS.md).
 
 ## Observability
 
@@ -114,7 +121,8 @@ until you switch to a paid or local model.
 ```
 src/server/   MCP server (tools, JD parser, resume matching)
 src/rag/      tokenizer, heading-aware chunker, BM25, hybrid fusion
-src/store/    application tracker storage (JSON file)
+src/store/    transactional SQLite tracker, durable preview and idempotency ledger
+src/app/      local HTTP host and visual JD-to-board workbench
 src/agent/    agent loop, host write gate and citation guard, tracing, CLI, llm/ (provider-neutral client, adapters, cache, limiter)
 data/sample/  synthetic resume, JD, applications
 evals/        case files, graders, runner, retrieval metrics

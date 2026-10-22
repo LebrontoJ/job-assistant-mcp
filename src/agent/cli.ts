@@ -2,6 +2,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { randomUUID } from "node:crypto";
 import { createInterface } from "node:readline/promises";
+import { modelVerifier } from "./grounding.js";
 import { ExecutionBudget } from "./execution.js";
 import { createLLM } from "./llm/index.js";
 import { runAgent } from "./loop.js";
@@ -38,7 +39,7 @@ async function main() {
   const oneShot = process.argv.slice(2).join(" ").trim();
   let history: Message[] = [];
   const ask = async (text: string) => {
-    const run = await runAgent(llm, mcp, text, { history, tracer, taskId: sessionId, runId: `${sessionId}-t${++turn}` });
+    const run = await runAgent(llm, mcp, text, { history, tracer, groundingVerifier: modelVerifier(llm), taskId: sessionId, runId: `${sessionId}-t${++turn}` });
     history = run.messages;
     for (const t of run.trace) console.error(`  [tool] ${t.name}(${shorten(JSON.stringify(t.args))})${t.isError ? " -> error" : ""}`);
     console.log(run.answer || `(no answer: ${run.stoppedBecause})`);

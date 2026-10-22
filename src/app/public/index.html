@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Job Assistant · 有据可循的求职工作台</title><link rel="stylesheet" href="/app.css"><script src="/app.js" defer></script></head>
+<body>
+<header><a class="brand" href="/" aria-label="Job Assistant 首页"><span class="mark">J.</span> JOB ASSISTANT</a><span class="mode" id="mode">本地工作台</span></header>
+<main>
+<section class="intro"><p class="eyebrow">YOUR EXPERIENCE, WITH EVIDENCE</p><h1>让每一份经历，<br>找到它的<span>依据与机会。</span></h1><p>从岗位要求到简历建议，再到投递看板。每一步可核查，每一次写入由你确认。</p></section>
+<ol class="steps" aria-label="任务流程"><li id="step1" class="active"><b>01</b> 输入岗位</li><li id="step2"><b>02</b> 核对证据与建议</li><li id="step3"><b>03</b> 确认后更新看板</li></ol>
+<div id="notice" role="status" aria-live="polite" class="notice" hidden></div>
+<section class="workspace">
+<div class="input-panel"><div class="section-heading"><h2>岗位描述</h2><button id="sample" class="text-button" type="button">载入示例 JD ↗</button></div><p class="muted">粘贴完整 JD，保留职责、要求与加分项。</p>
+<form id="analyse-form"><label for="jd" class="sr-only">岗位描述 JD</label><textarea id="jd" minlength="20" maxlength="50000" required placeholder="在这里粘贴岗位描述…"></textarea><div class="input-footer"><span id="char-count">0 字符</span><div><button type="button" id="stop" class="secondary" hidden>停止分析</button><button id="analyse" class="primary" type="submit">开始分析 <span>→</span></button></div></div></form>
+<div class="note"><span>↳</span><p>依据来自你提供的履历资料。未找到依据的技能会单独列出，不会写成已有经历。</p></div></div>
+<div class="report-panel" id="report-panel" aria-busy="false"><div class="section-heading"><h2>分析报告</h2><span class="tag" id="report-status">等待输入</span></div><div id="empty" class="empty"><div class="evidence-icon">≡<span>✓</span></div><h3>先看证据，再作判断。</h3><p>分析后，你将在这里看到岗位匹配、来源原文和可采用的简历建议。</p><span class="tiny">PROFILE → EVIDENCE → DRAFT</span></div><div id="report" hidden></div></div>
+</section>
+<section id="tracking" class="tracking" hidden><div><p class="eyebrow">NEXT STEP</p><h2>将这个机会加入看板</h2><p class="muted">先预览完整内容，确认后才会保存。</p></div><form id="track-form"><label>公司<input id="company" maxlength="200" required></label><label>职位<input id="role" maxlength="200" required></label><label>阶段<select id="new-status"></select></label><label>下次跟进<input id="followup" type="date"></label><button class="primary" type="submit">预览添加 →</button></form></section>
+<section class="board-section"><div class="board-heading"><div><p class="eyebrow">APPLICATION PIPELINE</p><h2>投递看板 <span id="board-count">0</span></h2></div><button type="button" id="refresh" class="secondary">刷新看板 ↻</button></div><p class="muted board-hint">修改阶段后，点击卡片上的预览按钮核对变更。</p><div id="board" class="board" aria-label="投递看板"></div></section>
+<footer><span>JOB ASSISTANT / MCP WORKSPACE</span><span>你的经历，是所有建议的起点。</span></footer>
+</main>
+<dialog id="preview-dialog" aria-labelledby="preview-title"><div class="dialog-header"><p class="eyebrow">REVIEW BEFORE WRITING</p><h2 id="preview-title">确认这次变更</h2></div><div id="preview-content"></div><p id="preview-expiry" class="muted"></p><p id="decision-error" role="alert" hidden></p><div class="dialog-actions"><button type="button" id="cancel" class="secondary">取消此次操作</button><button type="button" id="approve" class="primary">确认并保存</button></div></dialog>
+</body></html>

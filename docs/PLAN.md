@@ -13,7 +13,7 @@ Non-goals: scraping job boards, interview prep, salary analysis.
 - **Server is model-free.** Tools return structured, checkable data; the agent reasons over it.
 - **Writes are gated.** Write tools preview unless `confirm=true`; evals test that the agent never confirms on its own.
 - **Provider-neutral model layer.** `LLMClient` + adapters (Gemini first, Claude later). Tool schemas are defined once (MCP `tools/list`) and translated per adapter.
-- **RAG stays small.** Markdown profile, heading-based chunks (200-400 chars), BM25 first then local embeddings (no API key needed), SQLite or JSON storage, answers must cite chunks.
+- **RAG stays small.** Markdown profile, heading-based chunks (200-400 chars), BM25 first then local embeddings (no API key needed), SQLite transactional storage, answers must cite chunks.
 - **Synthetic eval data** so the repo can be public.
 
 ## Eval design (target 30-50 cases, JSONL)
@@ -36,18 +36,17 @@ with response caching and rate-limit-aware concurrency, so the same suite compar
 3. **M3 agent flows** (done): grounding rules, MCP prompts, JD -> match -> bullets -> preview -> confirmed write verified on live Gemini.
 4. **M4 evals** (done): 29 cases, rule + LLM-judge graders, response cache, retrieval metrics, Gemini baseline (see docs/EVALS.md).
 5. **M4.5 Claude adapter**: adapter written and unit-tested (done); live run + same-suite comparison table still needs an Anthropic credential.
-6. **M5 iterate + polish**: one measured improvement round, README demo and results.
+6. **01–08 Agent application upgrade** (implemented): pinned baseline/protocol, structured evidence report,
+   claim validation with bounded repair, exact explicit approval, SQLite transactions/idempotency,
+   bounded tool execution/recovery, correlated redacted traces, and a local JD-to-board UI.
+   See [IMPLEMENTATION.md](IMPLEMENTATION.md) and [APP.md](APP.md). New live quality scores are still pending.
 
-## Open items
+## Next commits (09–12)
 
-- Run the suite on Claude (agent and, separately, judge) and publish the comparison table; until then the Claude path is untested live.
+- 09: expand independently labelled retrieval data and multiple profile corpora; add no-answer queries and split by profile/document.
+- 10: same-suite retrieval and before/after grounding experiments, repeated live runs, per-case regressions and explicit metric denominators.
+- 11: publish sanitized reproducible comparisons and recorded normal/failure walkthroughs; improve first-run packaging based on results.
+- 12: obtain 3–5 real-user trials with consent, capture anonymized findings and turn recurring issues into regressions.
 
-- Held-out prompts for `inflate_experience`-style failures before touching the prompt; a stronger or non-Gemini judge; grow adversarial and faithfulness cases.
-- Observability follow-ups: OpenTelemetry export, cost estimates when running a priced model, embedding-call latency.
-
-- Local embedding model (no key needed); grow the retrieval and match sets and the corpus so recall@k and the match numbers mean something.
-- `match_resume` flags quantities (years) but does not compute them; a date parser over the profile could.
-- Recognising paraphrased `supported` requirements needs more than cosine similarity (a reranker or an LLM check over the retrieved passage, measured on the same labelled set).
-
-- Verify the Gemini adapter against the live API (needs a key); confirm the free-tier model ID and quota in AI Studio.
-- Pensum JSON compatibility for the tracker store.
+Optional later work: live Claude verification, local embedder, exact date-based experience calculation, stronger semantic verification,
+Pensum integration, priced-model cost estimates and OpenTelemetry export. These are not prerequisites for using the local app.

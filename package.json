@@ -10,7 +10,7 @@
     "node": ">=24.0.0"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.json && node --import tsx scripts/build-assets.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "server": "node --import tsx src/server/index.ts",
@@ -19,7 +19,9 @@
     "eval:retrieval": "node --import tsx evals/run.ts --retrieval-only",
     "trace": "node --import tsx src/agent/trace-cli.ts",
     "eval:freeze": "node --import tsx scripts/freeze-baseline.ts",
-    "store:migrate": "node --import tsx scripts/migrate-store.ts"
+    "store:migrate": "node --import tsx scripts/migrate-store.ts",
+    "app": "node --import tsx src/app/index.ts",
+    "eval:claims": "node --import tsx scripts/check-claims.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.135.0",

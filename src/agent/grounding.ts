@@ -21,7 +21,7 @@ export async function validateClaim(claim: Claim, sources: TaskEvidence[], verif
   const statement = normal(claim.text.replace(/\[[^\]]*\.md#\d+[^\]]*\]/g, ''));
   if (!statement) return result(false, 'empty_claim');
   const lines = passages.flatMap(e => sentences(e.text));
-  if (lines.some(line => normal(line).includes(statement))) return result(true, 'source_extract');
+  if (lines.some(line => normal(line) === statement)) return result(true, 'source_extract');
   const wanted = terms(statement);
   for (const quantity of quantities(statement)) {
     const anchored = lines.filter(line => quantities(line).includes(quantity));
@@ -34,7 +34,7 @@ export async function validateClaim(claim: Claim, sources: TaskEvidence[], verif
   // A narrowly normalised paraphrase can be accepted offline; arbitrary novel wording needs a semantic verifier.
   if (lines.some(line => {
     const have = terms(line);
-    return wanted.size >= 2 && [...wanted].every(t => have.has(t)) && !/\b(?:not|never|without|no)\b|不|未/.test(statement + ' ' + normal(line));
+    return wanted.size >= 2 && [...wanted].every(t => have.has(t)) && !/\b(?:not|never|without|no|plan|planned|planning|wish|want|consider|learning|learn|aspire|hypothetical)\b|不|未|计划|打算|希望|学习/.test(statement + ' ' + normal(line));
   })) return result(true, 'conservative_paraphrase');
   if (!verify) return result(false, 'semantic_verification_required');
   try { return result(await verify(claim, passages), 'semantic_verification'); }
@@ -70,7 +70,12 @@ export async function answerGroundingProblem(answer: string, userText: string, m
   const sources = messageEvidence(messages);
   const profileTask = /resume|cover letter|my experience|pretend.*(?:years|experience)|简历|我的经历|工作经验|改写|bullets|tailor/i.test(userText);
   const cited = /\[[^\]]*\.md#\d+[^\]]*\]/.test(answer);
-  if (profileTask && !sources.length && !/cannot|can't|no evidence|not found|无法|没有.*依据|不能编造/i.test(answer)) return 'Retrieve profile evidence before answering a resume or experience request. Do not invent facts.';
+  const refusalOnly = /^(?:I (?:cannot|can't|won't)|No evidence|I found no evidence|无法|没有.*依据|不能编造)/i.test(answer.trim())
+    && !/\d|[一二三四五六七八九十]+年|\b(?:you have|I have|you built|I built|you led|I led|your experience is)\b|拥有|曾负责|曾实现/i.test(answer);
+  if (profileTask && !sources.length && !refusalOnly) return 'Retrieve profile evidence before answering a resume or experience request. Do not invent facts.';
+  if (profileTask && !refusalOnly) for (const line of answer.split('\n')) {
+    if (!/\.md#\d+/.test(line) && /\b(?:built|have|led|managed|developed|worked|reduced|cut|years? of|expertise in|experience with)\b|拥有|曾负责|曾实现/i.test(line)) return 'A factual experience statement has no citation. Cite and verify each factual statement, or remove it.';
+  }
   if (!cited) return undefined;
   for (const line of answer.split('\n').filter(l => /\.md#\d+/.test(l))) {
     const evidenceIds = [...line.matchAll(/([\w./-]+\.md#\d+)/g)].map(m => m[1]!);
