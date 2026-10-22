@@ -23,7 +23,7 @@ export interface ToolResult {
 
 export type Message =
   /** `synthetic` marks text the host injected (e.g. a citation reminder); it is never a human reply. */
-  | { role: "user"; text: string; synthetic?: boolean }
+  | { role: "user"; text: string; synthetic?: boolean; approval?: { operationId: string; decision: "approve" | "cancel" } }
   /** `raw` is the vendor's own message, replayed verbatim (e.g. Gemini thought signatures). */
   | { role: "assistant"; text: string; toolCalls: ToolCall[]; raw?: unknown }
   | { role: "tool"; results: ToolResult[] };

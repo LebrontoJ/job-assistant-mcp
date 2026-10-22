@@ -60,6 +60,7 @@ export interface RunOptions {
   /** Send the model back once when its answer cites nothing or cites unknown ids. Default true. */
   citationGuard?: boolean;
   /** Receives one event per model call, tool call, guard action and run boundary. */
+  approval?: { operationId: string; decision: "approve" | "cancel" };
   groundingVerifier?: SemanticVerifier;
   tracer?: Tracer;
   /** Identifies this run in trace events. Defaults to a random id. */
@@ -77,7 +78,7 @@ export async function runAgent(
   const startedAt = Date.now();
   const now = () => new Date().toISOString();
   const tools = await listToolSpecs(mcp);
-  const messages: Message[] = [...(opts.history ?? []), { role: "user", text: userText }];
+  const messages: Message[] = [...(opts.history ?? []), { role: "user", text: userText, ...(opts.approval ? { approval: opts.approval } : {}) }];
   const trace: ToolTrace[] = [];
   const usage: Usage = { inputTokens: 0, outputTokens: 0 };
   tracer?.emit({ type: "run_start", runId, ts: now(), provider: llm.provider, model: llm.model, user: clip(userText, 200) });
@@ -136,6 +137,7 @@ export async function runAgent(
           };
           if (opts.writeGate !== false) {
             const decision = checkWriteGate(messages, call);
+            if (decision.operationId) call.args = { ...call.args, operationId: decision.operationId };
             if (!decision.allowed) {
               blockedWrites++;
               tracer?.emit({ type: "guard", runId, ts: now(), step, kind: "write_blocked", detail: `${call.name}: ${decision.reason}` });

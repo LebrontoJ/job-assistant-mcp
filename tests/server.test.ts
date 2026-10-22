@@ -35,7 +35,7 @@ describe("MCP server", () => {
     expect(await store.list({ company: "initech" })).toHaveLength(0);
 
     const done = JSON.parse(
-      textOf(await client.callTool({ name: "add_application", arguments: { ...args, confirm: true } })),
+      textOf(await client.callTool({ name: "add_application", arguments: { ...args, confirm: true, operationId: preview.operation.id } })),
     );
     expect(done.status).toBe("created");
     expect(await store.list({ company: "initech" })).toHaveLength(1);
@@ -45,7 +45,7 @@ describe("MCP server", () => {
     const { client } = await connectedPair();
     const r = await client.callTool({
       name: "add_application",
-      arguments: { company: "northwind labs", role: "backend engineer", confirm: true },
+      arguments: { company: "northwind labs", role: "backend engineer" },
     });
     expect(JSON.parse(textOf(r)).status).toBe("duplicate");
   });
@@ -58,7 +58,7 @@ describe("MCP server", () => {
     expect(p.status).toBe("pending_confirmation");
     expect((await store.get("e5f6a7b8"))?.status).toBe("applied");
 
-    await client.callTool({ name: "update_application", arguments: { id: "e5f6a7b8", status: "oa", confirm: true } });
+    await client.callTool({ name: "update_application", arguments: { id: "e5f6a7b8", status: "oa", confirm: true, operationId: p.operation.id } });
     expect((await store.get("e5f6a7b8"))?.status).toBe("oa");
 
     const bad = await client.callTool({ name: "update_application", arguments: { id: "zzz", status: "oa" } });

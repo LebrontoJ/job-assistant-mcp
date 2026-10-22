@@ -3,6 +3,7 @@ import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import type { ProfileIndex } from "../rag/index.js";
 import { ApplicationStore, StatusSchema } from "../store/applications.js";
+import { newOperation, assertOperation, type PendingOperation } from "../store/operations.js";
 import { parseJd } from "./jd.js";
 import { matchProfile, type MatchOptions } from "./match.js";
 
@@ -24,6 +25,13 @@ const confirmField = z
   .describe("Must be true to actually write. Set it only after the user has explicitly approved the change.");
 
 export function createServer(store: ApplicationStore, profile?: ProfileIndex, opts: { match?: MatchOptions } = {}): McpServer {
+  const pending = new Map<string, PendingOperation>();
+  const completed = new Map<string, CallToolResult>();
+  const preview = (tool: string, args: Record<string, unknown>, extra: Record<string, unknown>) => {
+    const operation = newOperation(tool, args);
+    pending.set(operation.id, operation);
+    return json({ status: "pending_confirmation", ...extra, operation, hint: PENDING_HINT });
+  };
   const server = new McpServer({ name: "job-assistant", version: "0.1.0" });
 
   server.registerTool(
@@ -80,15 +88,22 @@ export function createServer(store: ApplicationStore, profile?: ProfileIndex, op
         nextFollowUp: z.string().optional().describe("YYYY-MM-DD."),
         notes: z.string().optional(),
         confirm: confirmField,
+        operationId: z.string().optional().describe("Operation id from the exact preview. Required for confirmed writes."),
       },
     },
-    async ({ confirm, ...input }) => {
+    async ({ confirm, operationId, ...input }) => {
+      if (confirm) {
+        try { assertOperation(pending.get(operationId ?? ""), "add_application", input); } catch (err) { return fail(String(err)); }
+        if (completed.has(operationId!)) return completed.get(operationId!)!;
+      }
       const duplicate = await store.findDuplicate(input.company, input.role);
       if (duplicate) {
         return json({ status: "duplicate", existing: duplicate, hint: "Use update_application instead." });
       }
-      if (!confirm) return json({ status: "pending_confirmation", preview: input, hint: PENDING_HINT });
-      return json({ status: "created", application: await store.add(input) });
+      if (!confirm) return preview("add_application", input, { preview: input });
+      const result = json({ status: "created", application: await store.add(input), operationId });
+      completed.set(operationId!, result);
+      return result;
     },
   );
 
@@ -105,15 +120,22 @@ export function createServer(store: ApplicationStore, profile?: ProfileIndex, op
         nextFollowUp: z.string().optional().describe("YYYY-MM-DD."),
         notes: z.string().optional(),
         confirm: confirmField,
+        operationId: z.string().optional().describe("Operation id from the exact preview. Required for confirmed writes."),
       },
     },
-    async ({ id, confirm, ...patch }) => {
+    async ({ id, confirm, operationId, ...patch }) => {
+      if (confirm) {
+        try { assertOperation(pending.get(operationId ?? ""), "update_application", { id, ...patch }); } catch (err) { return fail(String(err)); }
+        if (completed.has(operationId!)) return completed.get(operationId!)!;
+      }
       const current = await store.get(id);
       if (!current) return fail(`No application with id "${id}". Call list_applications to find the right id.`);
       if (!confirm) {
-        return json({ status: "pending_confirmation", current, changes: patch, hint: PENDING_HINT });
+        return preview("update_application", { id, ...patch }, { current, changes: patch });
       }
-      return json({ status: "updated", application: await store.update(id, patch) });
+      const result = json({ status: "updated", application: await store.update(id, patch), operationId });
+      completed.set(operationId!, result);
+      return result;
     },
   );
 

@@ -1,12 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { citationProblem, citedIds } from "../src/agent/citations.js";
+import { newOperation } from "../src/store/operations.js";
 import { checkWriteGate } from "../src/agent/gate.js";
 import { runAgent } from "../src/agent/loop.js";
 import type { ChatRequest, ChatResponse, LLMClient, Message } from "../src/agent/llm/types.js";
 import { connectedPair } from "./helpers.js";
 
 const add = (confirm?: boolean) => ({ id: "1", name: "add_application", args: { company: "Initech", role: "SRE", ...(confirm ? { confirm } : {}) } });
-const preview = JSON.stringify({ status: "pending_confirmation", preview: { company: "Initech", role: "SRE" } });
+const preview = JSON.stringify({ status: "pending_confirmation", preview: { company: "Initech", role: "SRE" }, operation: newOperation("add_application", { company: "Initech", role: "SRE" }) });
 const previewMsgs = (): Message[] => [
   { role: "user", text: "add Initech" },
   { role: "assistant", text: "", toolCalls: [add()] },
@@ -43,7 +44,7 @@ describe("checkWriteGate", () => {
   });
 
   it("matches update previews by application id", () => {
-    const up = JSON.stringify({ status: "pending_confirmation", current: { id: "e5f6a7b8" }, changes: {} });
+    const up = JSON.stringify({ status: "pending_confirmation", current: { id: "e5f6a7b8" }, changes: { status: "oa" }, operation: newOperation("update_application", { id: "e5f6a7b8", status: "oa" }) });
     const msgs: Message[] = [
       { role: "assistant", text: "", toolCalls: [{ id: "1", name: "update_application", args: { id: "e5f6a7b8", status: "oa" } }] },
       { role: "tool", results: [{ callId: "1", name: "update_application", text: up }] },
@@ -125,10 +126,10 @@ describe("agent loop enforcement", () => {
     expect(await store.list({ company: "initech" })).toHaveLength(1);
   });
 
-  it("can be switched off", async () => {
+  it("server preview enforcement remains even if host gate is switched off", async () => {
     const { client, store } = await connectedPair();
     await runAgent(scripted([call("add_application", { ...init, confirm: true }), { text: "ok" }]), client, "add", { writeGate: false });
-    expect(await store.list({ company: "initech" })).toHaveLength(1);
+    expect(await store.list({ company: "initech" })).toHaveLength(0);
   });
 
   it("sends the model back once to fix missing citations, using a synthetic message", async () => {
