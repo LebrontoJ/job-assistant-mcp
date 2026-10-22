@@ -7,7 +7,7 @@
   "description": "MCP job-search assistant: tool-calling agent, lightweight RAG over your own profile, and a small eval harness.",
   "type": "module",
   "engines": {
-    "node": ">=20"
+    "node": ">=24.0.0"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
@@ -18,7 +18,8 @@
     "eval": "tsx evals/run.ts",
     "eval:retrieval": "tsx evals/run.ts --retrieval-only",
     "trace": "tsx src/agent/trace-cli.ts",
-    "eval:freeze": "tsx scripts/freeze-baseline.ts"
+    "eval:freeze": "tsx scripts/freeze-baseline.ts",
+    "store:migrate": "node --import tsx scripts/migrate-store.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.135.0",

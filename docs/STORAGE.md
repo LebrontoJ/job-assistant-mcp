@@ -1,0 +1,7 @@
+# Transactional application storage
+
+Requires Node 24+ (`node:sqlite`, no native addon install). `APPLICATIONS_FILE=...json` imports that JSON once into `...json.sqlite`. The JSON is preserved and subsequent JSON edits are not automatically imported. A `.sqlite` path starts directly in SQLite. `pnpm store:migrate path/to/applications.json` performs and reports the import. Back up the source and database before moving real data; do not delete a database to re-import over live changes.
+
+SQLite transactions cover the application mutation AND its operation result. The operation id is the idempotency key, bound to a canonical digest of tool and full payload. Replaying the same completed operation returns its original result (including after restart or expiry); changing its payload fails. Updates bind the preview to the current integer version. A concurrent change requires a fresh preview/approval. Duplicates are enforced inside the transaction and by a unique normalized company/role key. WAL and a bounded busy timeout serialize independent local processes.
+
+The operations table stores pending previews, cancellations and completed results. Previews expire after ten minutes; cancellations survive restart. Human consent is checked by the agent/UI host, not inferred by SQLite or by a model-provided boolean. Direct MCP clients must implement their own explicit approval UI before submitting the exact preview operation id.
