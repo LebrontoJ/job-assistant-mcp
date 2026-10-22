@@ -34,6 +34,7 @@ export interface Usage {
 }
 
 export interface ChatRequest {
+  signal?: AbortSignal;
   system: string;
   messages: Message[];
   tools: ToolSpec[];

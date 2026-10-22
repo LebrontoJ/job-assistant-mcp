@@ -71,10 +71,11 @@ export class GeminiClient implements LLMClient {
           contents: toContents(req.messages),
           config: {
             systemInstruction: req.system,
+            abortSignal: req.signal,
             tools: req.tools.length ? [{ functionDeclarations: toDeclarations(req.tools) }] : undefined,
           },
         }),
-      { onRetry: () => retries++ },
+      { onRetry: () => retries++, signal: req.signal },
     );
 
     const candidate = res.candidates?.[0];

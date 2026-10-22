@@ -4,8 +4,8 @@ import type { ChatRequest, ChatResponse, LLMClient, Message, ToolCall, ToolSpec 
 
 /** The slice of the SDK this adapter touches, so tests can inject a fake. */
 export interface AnthropicLike {
-  messages: { create(params: Record<string, unknown>): Promise<WireResponse> };
-  beta: { messages: { create(params: Record<string, unknown>): Promise<WireResponse> } };
+  messages: { create(params: Record<string, unknown>, options?: { signal?: AbortSignal }): Promise<WireResponse> };
+  beta: { messages: { create(params: Record<string, unknown>, options?: { signal?: AbortSignal }): Promise<WireResponse> } };
 }
 
 interface WireBlock {
@@ -111,9 +111,9 @@ export class AnthropicClient implements LLMClient {
     const res = await withRetry(
       () =>
         useFallback
-          ? this.api.beta.messages.create({ ...params, betas: [FALLBACK_BETA], fallbacks: "default" })
-          : this.api.messages.create(params),
-      { onRetry: () => retries++ },
+          ? this.api.beta.messages.create({ ...params, betas: [FALLBACK_BETA], fallbacks: "default" }, { signal: req.signal })
+          : this.api.messages.create(params, { signal: req.signal }),
+      { onRetry: () => retries++, signal: req.signal },
     );
 
     const toolCalls: ToolCall[] = res.content

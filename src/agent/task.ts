@@ -1,3 +1,4 @@
+import { ExecutionBudget, ToolExecutor, boundedLLM, type ExecutionOptions } from './execution.js';
 import { randomUUID } from 'node:crypto';
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { z } from 'zod';
@@ -24,8 +25,8 @@ export interface TaskReport {
   validation: ClaimVerdict[];
 }
 
-export async function readTool<T>(client: Client, name: string, args: Record<string, unknown>): Promise<T> {
-  const out = await client.callTool({ name, arguments: args });
+export async function readTool<T>(client: Client, name: string, args: Record<string, unknown>, executor = new ToolExecutor(client)): Promise<T> {
+  const out = await executor.call(name, args);
   const content = out.content as Array<{ type: string; text?: string }>;
   const text = content.filter(c => c.type === 'text').map(c => c.text ?? '').join('\n');
   if (out.isError) throw new Error(`${name}: ${text}`);
@@ -33,14 +34,17 @@ export async function readTool<T>(client: Client, name: string, args: Record<str
 }
 
 /** A bounded task over MCP tools. A report never writes to the tracker. */
-export async function analyseTask(client: Client, jdText: string, opts: { llm?: LLMClient; taskId?: string } = {}): Promise<TaskReport> {
+export async function analyseTask(client: Client, jdText: string, opts: { llm?: LLMClient; taskId?: string; totalMs?: number; signal?: AbortSignal; execution?: ExecutionOptions } = {}): Promise<TaskReport> {
+  const budget = opts.execution?.budget ?? new ExecutionBudget(opts.totalMs, opts.signal);
+  const executor = new ToolExecutor(client, { ...opts.execution, budget });
+  if (opts.llm) opts = { ...opts, llm: boundedLLM(opts.llm, budget) };
   const taskId = opts.taskId ?? randomUUID();
-  const jd = await readTool<ParsedJd>(client, 'parse_jd', { text: jdText });
-  const match = await readTool<MatchReport>(client, 'match_resume', { jd_text: jdText });
+  const jd = await readTool<ParsedJd>(client, 'parse_jd', { text: jdText }, executor);
+  const match = await readTool<MatchReport>(client, 'match_resume', { jd_text: jdText }, executor);
   const evidence = new Map<string, TaskEvidence>();
   // Fetch complete passages, rather than treating match_resume's truncated excerpts as complete facts.
   for (const query of [...jd.requirements, ...jd.niceToHave].slice(0, 12).concat(jd.skills.join(' ') || jdText.slice(0, 300))) {
-    const result = await readTool<{ hits: TaskEvidence[] }>(client, 'search_profile', { query, k: 3 });
+    const result = await readTool<{ hits: TaskEvidence[] }>(client, 'search_profile', { query, k: 3 }, executor);
     for (const hit of result.hits) evidence.set(hit.id, EvidenceSchema.parse(hit));
   }
   const passages = [...evidence.values()];

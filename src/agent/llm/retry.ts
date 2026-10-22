@@ -1,4 +1,5 @@
 export interface RetryOptions {
+  signal?: AbortSignal;
   retries?: number;
   baseDelayMs?: number;
   /** Upper bound for a server-requested wait, so a bad hint cannot stall a run forever. */
@@ -36,16 +37,26 @@ export async function withRetry<T>(fn: () => Promise<T>, opts: RetryOptions = {}
   const { retries = 4, baseDelayMs = 1000, maxRetryAfterMs = 90_000, isRetryable = isTransient } = opts;
   const sleep = opts.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
   for (let attempt = 0; ; attempt++) {
+    opts.signal?.throwIfAborted();
     try {
       return await fn();
     } catch (err) {
+      if (opts.signal?.aborted) throw err;
       if (attempt >= retries || !isRetryable(err)) throw err;
       const backoff = baseDelayMs * 2 ** attempt * (0.75 + Math.random() * 0.5);
       const asked = retryAfterMs(err);
       // Wait at least as long as the server asked (plus a second of slack), never less than our own backoff.
       const waitMs = asked === undefined ? backoff : Math.max(backoff, Math.min(asked + 1000, maxRetryAfterMs));
       opts.onRetry?.({ attempt: attempt + 1, waitMs, error: err });
-      await sleep(waitMs);
+      if (!opts.sleep && opts.signal) {
+        await new Promise<void>((resolve, reject) => {
+          const signal = opts.signal!;
+          const abort = () => { clearTimeout(timer); reject(signal.reason); };
+          const timer = setTimeout(() => { signal.removeEventListener("abort", abort); resolve(); }, waitMs);
+          signal.addEventListener("abort", abort, { once: true });
+          if (signal.aborted) abort();
+        });
+      } else await sleep(waitMs);
     }
   }
 }

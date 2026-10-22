@@ -31,11 +31,13 @@ export class RateLimitedLLM implements LLMClient {
   }
 
   async chat(req: ChatRequest): Promise<ChatResponse> {
+    req.signal?.throwIfAborted();
     // Reserve the slot synchronously so concurrent callers queue behind each other.
     const start = Math.max(this.clock.now(), this.nextAt);
     this.nextAt = start + this.interval;
     const wait = start - this.clock.now();
     if (wait > 0) await this.clock.sleep(wait);
+    req.signal?.throwIfAborted();
     return this.inner.chat(req);
   }
 }

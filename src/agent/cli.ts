@@ -1,6 +1,7 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { createInterface } from "node:readline/promises";
+import { ExecutionBudget } from "./execution.js";
 import { createLLM } from "./llm/index.js";
 import { runAgent } from "./loop.js";
 import { JsonlTracer } from "./trace.js";
@@ -21,14 +22,16 @@ async function main() {
     : undefined;
   let turn = 0;
   const mcp = new Client({ name: "job-assistant-cli", version: "0.1.0" });
-  await mcp.connect(
+  try {
+  await new ExecutionBudget(20_000).run("mcp.connect", 15_000, signal => mcp.connect(
     new StdioClientTransport({
       command: process.execPath,
       args: ["--import", "tsx", "src/server/index.ts"],
       env: { ...(process.env as Record<string, string>) },
       stderr: "inherit",
     }),
-  );
+    { signal, timeout: 15_000 },
+  ));
 
   const oneShot = process.argv.slice(2).join(" ").trim();
   let history: Message[] = [];
@@ -44,14 +47,15 @@ async function main() {
     await ask(oneShot);
   } else {
     const rl = createInterface({ input: process.stdin, output: process.stdout });
+    try {
     for (;;) {
       const line = (await rl.question("> ")).trim();
       if (!line || line === "exit") break;
       await ask(line);
     }
-    rl.close();
+    } finally { rl.close(); }
   }
-  await mcp.close();
+  } finally { await mcp.close(); }
 }
 
 main().catch((err) => {

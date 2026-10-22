@@ -1,4 +1,5 @@
 import type { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { ExecutionBudget, ToolExecutor, boundedLLM, type ExecutionOptions } from "./execution.js";
 import { answerGroundingProblem, type SemanticVerifier } from "./grounding.js";
 import { citationProblem } from "./citations.js";
 import { BLOCKED_MESSAGE, checkWriteGate } from "./gate.js";
@@ -51,6 +52,9 @@ export async function listToolSpecs(mcp: Client): Promise<ToolSpec[]> {
 }
 
 export interface RunOptions {
+  execution?: ExecutionOptions;
+  totalMs?: number;
+  signal?: AbortSignal;
   maxSteps?: number;
   system?: string;
   /** Prior turns, for multi-turn chat. */
@@ -74,10 +78,13 @@ export async function runAgent(
   opts: RunOptions = {},
 ): Promise<AgentRun> {
   const { maxSteps = 8, system = SYSTEM_PROMPT, tracer } = opts;
+  const budget = opts.execution?.budget ?? new ExecutionBudget(opts.totalMs, opts.signal);
+  llm = boundedLLM(llm, budget);
+  const executor = new ToolExecutor(mcp, { ...opts.execution, budget });
   const runId = opts.runId ?? Math.random().toString(36).slice(2, 10);
   const startedAt = Date.now();
   const now = () => new Date().toISOString();
-  const tools = await listToolSpecs(mcp);
+  let tools: ToolSpec[];
   const messages: Message[] = [...(opts.history ?? []), { role: "user", text: userText, ...(opts.approval ? { approval: opts.approval } : {}) }];
   const trace: ToolTrace[] = [];
   const usage: Usage = { inputTokens: 0, outputTokens: 0 };
@@ -95,6 +102,7 @@ export async function runAgent(
 
   let step = 1;
   try {
+    tools = await budget.run("tools/list", 15_000, signal => mcp.listTools({}, { signal, timeout: 15_000 })).then(({ tools }) => tools.map(t => ({ name: t.name, description: t.description ?? "", inputSchema: t.inputSchema as Record<string, unknown> })));
     for (; step <= maxSteps; step++) {
       const res = await llm.chat({ system, messages, tools });
       usage.inputTokens += res.usage.inputTokens;
@@ -146,7 +154,7 @@ export async function runAgent(
             }
           }
           try {
-            const out = await mcp.callTool({ name: call.name, arguments: call.args });
+            const out = await executor.call(call.name, call.args, call.id);
             const content = (out.content ?? []) as Array<{ type: string; text?: string }>;
             const text = content.map((c) => (c.type === "text" ? c.text : `[${c.type}]`)).join("\n");
             const isError = out.isError === true;
