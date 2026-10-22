@@ -226,3 +226,5 @@ before trusting a score, and expect rule-based graders to be wrong in both direc
 - **33 cases**, still below the 30-50 target for adversarial and faithfulness depth.
 - Data is synthetic and tiny (5 profile chunks, 12 retrieval queries), so retrieval scores are optimistic and
   differences between modes are anecdotes, not statistics.
+
+Current report denominators: case/suite/category pass rates exclude ungraded cases and run errors; dimension rates exclude skipped checks and grader errors. The report separately gives overall completion, total ungraded cases and run errors. Stability excludes infrastructure errors as well as ungraded runs; historical tables above retain their original reporting conventions.

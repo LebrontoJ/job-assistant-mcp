@@ -20,3 +20,16 @@ Each numbered item is a separate commit. This log records implementation and che
 - Live drafting + semantic verification is exercised with a scripted model through the HTTP task API; no new paid/live model run or before/after live comparison was performed. Historical scores remain labelled historical.
 - Remaining scope: expanded data and controlled comparisons (09–10), recorded production-model demos (11), real-user feedback (12). Semantic verification remains probabilistic; numeric experience duration is not calculated. New current-runtime success/faithfulness rates must be measured before claiming improvement.
 - Compiled entrypoint smoke check: `node dist/src/app/index.js` returned HTTP 200 and recovered all 5 demo rows, including the confirmed example, from the same temporary database.
+
+## Review fixes (single follow-up commit)
+
+- Local claim acceptance now preserves word order and relations; numeric order is checked within the same supporting sentence. Arbitrary paraphrases require semantic verification. Multi-sentence verbatim lines are recognised as extracts, and offline outputs exclude rejected drafts.
+- Experience checks also inspect ordinary questions and personal-experience language in answers. This remains a heuristic guard, not a proof that arbitrary natural-language claims are grounded. Semantic verification remains probabilistic.
+- Citation parsing is shared and supports Unicode and spaces in bracketed filenames.
+- Update previews return the displayed snapshot and bound version from the same SQLite transaction.
+- CLI semantic verification shares the task deadline and cancellation signal, runs once per final candidate, and records a grounding stage.
+- A rejected document-embedding promise is cleared so the next attempt can rebuild the index.
+- Eval verdict rates exclude ungraded/run-error cases; overall completion is reported separately. Infrastructure failures are excluded from model stability verdicts.
+- Tool statistics combine structured-task attempts by run/call id, preferring Agent call events when available to avoid double counting. Attempt-only durations sum execution time and exclude retry backoff.
+
+Validation: 216 tests across 23 files, typecheck, build, development claims (5/5), frozen held-out claims (4/4), and unchanged BM25 retrieval metrics. Regression tests use isolated data and scripted models, not new live-model quality measurements.

@@ -139,7 +139,7 @@ describe("agent loop enforcement", () => {
       { text: "You cut latency by 38%." },          // strong retrieval, no citation -> retry
       { text: "You cut latency by 38% [resume.md#0]." },
     ]);
-    const run = await runAgent(llm, client, "What did I do with PostgreSQL?");
+    const run = await runAgent(llm, client, "What did I do with PostgreSQL?", { groundingVerifier: async () => true });
     expect(run.citationRetries).toBe(1);
     expect(run.answer).toContain("[resume.md#0]");
     expect(run.steps).toBe(3);

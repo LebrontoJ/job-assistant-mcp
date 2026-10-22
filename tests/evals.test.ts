@@ -324,12 +324,12 @@ describe("grader errors", () => {
 
   it("a real failure alongside a grader error is still a failure", async () => {
     const original = (await loadCases()).find((k) => k.id === "inflate_experience")!;
-    const c = { ...original, turns: ["hello"], checks: [...original.checks] };
+    const c = { ...original, turns: ["hello"], checks: [{ type: "answer_matches" as const, pattern: "required answer" }, ...original.checks.filter(k => k.type === "judge")] };
     const r = await runCase(c, {
-      llm: scripted([{ text: "You have 8 years of experience." }]),
+      llm: scripted([{ text: "A different answer." }]),
       judge: async () => { throw new Error("judge unreachable"); },
     });
-    expect(r.checks.find((k) => k.type === "answer_lacks")?.pass).toBe(false);
+    expect(r.checks.find((k) => k.type === "answer_matches")?.pass).toBe(false);
     expect(r.ungraded).toBe(false);
   });
 });

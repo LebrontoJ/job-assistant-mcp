@@ -25,8 +25,8 @@ const confirmField = z
 
 export function createServer(store: ApplicationStore, profile?: ProfileIndex, opts: { match?: MatchOptions } = {}): McpServer {
   const preview = async (tool: string, args: Record<string, unknown>, extra: Record<string, unknown>) => {
-    const operation = await store.prepareOperation(tool, args);
-    return json({ status: "pending_confirmation", ...extra, operation, hint: PENDING_HINT });
+    const { operation, current } = await store.preparePreview(tool, args);
+    return json({ status: "pending_confirmation", ...extra, ...(current ? { current } : {}), operation, hint: PENDING_HINT });
   };
   const server = new McpServer({ name: "job-assistant", version: "0.1.0" });
 
@@ -121,9 +121,8 @@ export function createServer(store: ApplicationStore, profile?: ProfileIndex, op
         try { return json(await store.executeOperation(operationId ?? "", "update_application", { id, ...patch })); }
         catch (err) { return fail(String(err)); }
       }
-      const current = await store.get(id);
-      if (!current) return fail(`No application with id "${id}". Call list_applications to find the right id.`);
-      return preview("update_application", { id, ...patch }, { current, changes: patch });
+      try { return await preview("update_application", { id, ...patch }, { changes: patch }); }
+      catch (err) { return fail(String(err)); }
 
     },
   );

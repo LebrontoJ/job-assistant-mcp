@@ -147,8 +147,16 @@ export function summarizeEvents(events: TraceEvent[]): TraceStats {
   const llmMs = events.flatMap((e) => (e.type === "llm_call" && e.ms !== undefined ? [e.ms] : []));
   const llmCalls = events.filter((e): e is Extract<TraceEvent, { type: "llm_call" }> => e.type === "llm_call");
   const byTool = new Map<string, { calls: number; errors: number; blocked: number; total: number; max: number }>();
-  for (const e of events) {
-    if (e.type !== "tool_call") continue;
+  // Prefer a complete call event; otherwise combine attempts into one logical call.
+  const key = (e: TraceEvent) => `${e.runId}:${e.toolCallId}`;
+  const calls = events.filter((e): e is Extract<TraceEvent, { type: 'tool_call' }> => e.type === 'tool_call');
+  const complete = new Set(calls.filter(e => e.toolCallId).map(key));
+  const attempts = new Map<string, { name: string; ms: number; isError: boolean; blocked?: boolean }>();
+  for (const e of events) if (e.type === 'tool_attempt' && !complete.has(key(e))) {
+    const previous = attempts.get(key(e));
+    attempts.set(key(e), { name: e.name, ms: (previous?.ms ?? 0) + e.ms, isError: !!e.errorKind });
+  }
+  for (const e of [...calls, ...attempts.values()]) {
     const t = byTool.get(e.name) ?? { calls: 0, errors: 0, blocked: 0, total: 0, max: 0 };
     t.calls++;
     if (e.isError) t.errors++;

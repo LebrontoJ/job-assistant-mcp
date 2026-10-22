@@ -118,18 +118,23 @@ export async function runAgent(
 
       if (res.toolCalls.length === 0) {
         const stop = res.finish === "blocked" ? "blocked" : res.finish === "length" ? "truncated" : "answered";
-        if (stop === "answered" && opts.citationGuard !== false && citationRetries < 1 && step < maxSteps) {
-          const problem = citationProblem(res.text, messages, trace) ?? await answerGroundingProblem(res.text, userText, messages, opts.groundingVerifier);
-          if (problem) {
-            citationRetries++;
-            tracer?.emit({ type: "guard", runId, ts: now(), step, kind: "citation_retry", detail: problem });
-            messages.push({ role: "user", text: problem, synthetic: true });
-            continue;
-          }
-        }
         if (stop === "answered" && opts.citationGuard !== false) {
-          const remaining = citationProblem(res.text, messages, trace) ?? await answerGroundingProblem(res.text, userText, messages, opts.groundingVerifier);
-          if (remaining) return finish("I could not verify this draft against the profile evidence. Unsupported content was withheld; please add evidence or narrow the request.", step, "blocked");
+          const problem = citationProblem(res.text, messages, trace) ?? await traceStage(tracer, runId, 'grounding', () =>
+            budget.run('grounding', 60_000, signal => {
+              const verifier: SemanticVerifier | undefined = opts.groundingVerifier
+                ? (claim, evidence) => opts.groundingVerifier!(claim, evidence, signal)
+                : undefined;
+              return answerGroundingProblem(res.text, userText, messages, verifier);
+            }));
+          if (problem) {
+            if (citationRetries < 1 && step < maxSteps) {
+              citationRetries++;
+              tracer?.emit({ type: "guard", runId, ts: now(), step, kind: "citation_retry", detail: problem });
+              messages.push({ role: "user", text: problem, synthetic: true });
+              continue;
+            }
+            return finish("I could not verify this draft against the profile evidence. Unsupported content was withheld; please add evidence or narrow the request.", step, "blocked");
+          }
         }
         return finish(res.text, step, stop);
       }

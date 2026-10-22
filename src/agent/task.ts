@@ -98,6 +98,7 @@ async function buildTask(client: Client, jdText: string, opts: TaskOptions & { t
     }
   } else {
     validation.push(...await Promise.all(draft.rewrites.map(c => validateClaim(c, passages))));
+    draft.rewrites = validation.filter(v => v.supported).map(v => v.claim);
   }
   return { taskId, jd, requirements: match.items, missingSkills: match.summary.skillsMissing, evidence: passages, draft, validation,
     limitations: ['Requirement labels are retrieval signals; inspect the quoted evidence. Missing evidence does not prove missing ability.', 'Years of experience are not calculated.'] };

@@ -124,7 +124,7 @@ export class ProfileIndex {
     this.vectors ??= this.embedder!.embed(
       this.chunks.map((c) => `${c.heading}\n${c.text}`),
       "document",
-    );
+    ).catch(error => { this.vectors = undefined; throw error; });
     return this.vectors;
   }
 }

@@ -81,3 +81,5 @@ names, error classes, timings and token counts remain. MemoryTracer retains cont
 it without sanitizing. Library callers may explicitly opt into `new JsonlTracer(file, { includeContent: true })` for
 private debugging. Existing historical files are not retroactively redacted. Embedding timings include cache lookup
 when wrapped around the caching embedder; cached vector calls can be near zero.
+
+Structured-task performance summaries group `tool_attempt` events by run/call id. A recovered retry counts as one successful logical call; a final failed attempt counts as an error. Where a `tool_call` event exists, its complete duration is used once. Otherwise duration is the sum of attempt execution times (retry backoff excluded). CLI semantic validation is recorded as a bounded `grounding` stage.

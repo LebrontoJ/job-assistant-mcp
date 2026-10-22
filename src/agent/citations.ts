@@ -1,9 +1,13 @@
 import type { Message } from "./llm/types.js";
 import type { ToolTrace } from "./loop.js";
 
-const CITE = /([\w./-]+\.md#\d+)/g;
-
-export const citedIds = (text: string): string[] => [...new Set([...text.matchAll(CITE)].map((m) => m[1]!))];
+// Bracketed citations can contain spaces and Unicode filenames; bare ids cannot contain spaces.
+export const citedIds = (text: string): string[] => {
+  const bracketed = [...text.matchAll(/\[([^\]]+)\]/g)].flatMap(m => m[1]!.split(/[,;]\s*/)
+    .map(id => id.trim()).filter(id => /^.+\.md#\d+$/.test(id)));
+  const bare = [...text.replace(/\[[^\]]*\]/g, '').matchAll(/([^\s\[\],;]+\.md#\d+)/gu)].map(m => m[1]!);
+  return [...new Set([...bracketed, ...bare])];
+};
 
 interface Evidence {
   /** Every passage id any retrieval tool returned. */

@@ -115,12 +115,15 @@ export class ApplicationStore {
   }
 
   async prepareOperation(tool: string, args: Record<string, unknown>): Promise<PendingOperation> {
+    return (await this.preparePreview(tool, args)).operation;
+  }
+  async preparePreview(tool: string, args: Record<string, unknown>): Promise<{ operation: PendingOperation; current?: Application }> {
     return this.use(db => this.transaction(db, () => {
       const current = tool === 'update_application' ? this.load(db).find(a => a.id === args.id) : undefined;
       if (tool === 'update_application' && !current) throw new Error('APPLICATION_NOT_FOUND');
       const op = newOperation(tool, args, current?.version);
       db.prepare('INSERT INTO operations (id, data) VALUES (?, ?)').run(op.id, JSON.stringify(op));
-      return op;
+      return { operation: op, current };
     }));
   }
   async cancelOperation(id: string): Promise<boolean> {

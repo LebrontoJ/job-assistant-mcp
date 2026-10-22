@@ -8,6 +8,7 @@ export interface Tally {
   skipped: number;
   /** Cases whose only problem was a grader error; counted in `total` but neither passed nor failed. */
   ungraded?: number;
+  errors?: number;
 }
 export interface Summary {
   cases: Tally;
@@ -40,18 +41,23 @@ export function summarize(results: CaseResult[]): Summary {
     s.cases.total++;
     if (r.passed) s.cases.passed++;
     if (r.ungraded) s.cases.ungraded = (s.cases.ungraded ?? 0) + 1;
-    if (r.error) s.errors++;
+    if (r.error) { s.errors++; s.cases.errors = (s.cases.errors ?? 0) + 1; }
     const suite = (s.bySuite[r.suite] ??= tally());
     suite.total++;
+    if (r.ungraded) suite.ungraded = (suite.ungraded ?? 0) + 1;
+    if (r.error) suite.errors = (suite.errors ?? 0) + 1;
     if (r.passed) suite.passed++;
     s.blockedWrites += r.blocked;
     s.citationRetries += r.citationRetries;
     const cat = (s.byCategory[r.category] ??= tally());
     cat.total++;
+    if (r.ungraded) cat.ungraded = (cat.ungraded ?? 0) + 1;
+    if (r.error) cat.errors = (cat.errors ?? 0) + 1;
     if (r.passed) cat.passed++;
     for (const k of r.checks) {
       const dim = (s.byDimension[k.dimension] ??= tally());
-      if (k.skipped) dim.skipped++;
+      if (k.graderError) { dim.total++; dim.ungraded = (dim.ungraded ?? 0) + 1; }
+      else if (k.skipped) dim.skipped++;
       else {
         dim.total++;
         if (k.pass) dim.passed++;
@@ -65,10 +71,11 @@ export function summarize(results: CaseResult[]): Summary {
   return s;
 }
 
-const pct = (t: Tally) => (t.total ? `${((100 * t.passed) / t.total).toFixed(0)}%` : "n/a");
+const graded = (t: Tally) => t.total - (t.ungraded ?? 0) - (t.errors ?? 0);
+const pct = (t: Tally) => (graded(t) ? `${((100 * t.passed) / graded(t)).toFixed(0)}%` : "n/a");
 const ungradedNote = (t: Tally) => (t.ungraded ? ` · **${t.ungraded} ungraded (grader error, not counted as pass or fail)**` : "");
 const row = (name: string, t: Tally) =>
-  `| ${name} | ${t.passed}/${t.total} | ${pct(t)}${t.skipped ? ` (+${t.skipped} skipped)` : ""} |`;
+  `| ${name} | ${t.passed}/${graded(t)} | ${pct(t)}${t.skipped ? ` (+${t.skipped} skipped)` : ""} |`;
 
 export interface CaseStability {
   id: string;
@@ -85,7 +92,8 @@ export function stability(runs: CaseResult[][]): { perCase: CaseStability[]; sta
   for (const run of runs) {
     for (const r of run) {
       const e = byId.get(r.id) ?? { id: r.id, category: r.category, passes: 0, runs: 0, ungraded: 0 };
-      if (r.ungraded) e.ungraded++;
+      if (r.error) { /* No model verdict: exclude infrastructure failures from stability. */ }
+      else if (r.ungraded) e.ungraded++;
       else {
         e.runs++;
         if (r.passed) e.passes++;
@@ -149,7 +157,8 @@ export function formatReport(meta: Meta, results: CaseResult[], retrieval?: Retr
   out.push("");
   if (results.length) {
     const repeated = runs && runs.length > 1;
-    out.push(`**${repeated ? `Case-runs passed (${runs!.length} runs)` : "Cases passed"}: ${s.cases.passed}/${s.cases.total} (${pct(s.cases)})**${ungradedNote(s.cases)}${s.errors ? ` · ${s.errors} run error(s)` : ""}`, "");
+    out.push(`**${repeated ? `Case-runs passed (${runs!.length} runs)` : "Cases passed"}: ${s.cases.passed}/${graded(s.cases)} (${pct(s.cases)})**${ungradedNote(s.cases)}${s.errors ? ` · ${s.errors} run error(s)` : ""}`, "");
+    out.push(`Overall completion: ${results.filter(r => !r.error).length}/${results.length}; graded: ${graded(s.cases)}; ungraded: ${s.cases.ungraded ?? 0}; run errors: ${s.errors}`, "");
     if (Object.keys(s.bySuite).length > 1) {
       out.push("| Suite | Passed | Rate |", "|---|---|---|");
       for (const [k, t] of Object.entries(s.bySuite).sort()) out.push(row(k, t));
