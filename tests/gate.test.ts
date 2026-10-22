@@ -152,7 +152,8 @@ describe("agent loop enforcement", () => {
     const twice = scripted([call("search_profile", { query: "PostgreSQL query latency" }), bad, bad, bad]);
     const run = await runAgent(twice, client, "q");
     expect(run.citationRetries).toBe(1);
-    expect(run.answer).toBe("Latency cut 38%.");
+    expect(run.stoppedBecause).toBe("blocked");
+    expect(run.answer).toMatch(/withheld/);
     const off = await runAgent(scripted([call("search_profile", { query: "PostgreSQL query latency" }), bad]), client, "q", { citationGuard: false });
     expect(off.citationRetries).toBe(0);
   });

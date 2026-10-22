@@ -35,7 +35,7 @@ describe("JD -> match -> evidence -> tracker flow", () => {
       call("2", "match_resume", { jd_text: JD }),
       call("3", "search_profile", { query: "postgres latency", k: 2 }),
       call("4", "add_application", { ...role, status: "wishlist" }),
-      { text: "Bullets drafted [resume.md#0]. Add Initech to your tracker?", finish: "stop" },
+      { text: "Cut PostgreSQL p95 query latency by 38% through index and query redesign. [resume.md#0]", finish: "stop" },
     ]);
     const run1 = await runAgent(turn1, client, "Tailor my resume to this JD and track it.", { maxSteps: 10 });
 

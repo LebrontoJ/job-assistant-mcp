@@ -1,4 +1,5 @@
 import type { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { answerGroundingProblem, type SemanticVerifier } from "./grounding.js";
 import { citationProblem } from "./citations.js";
 import { BLOCKED_MESSAGE, checkWriteGate } from "./gate.js";
 import { clip, type Tracer } from "./trace.js";
@@ -59,6 +60,7 @@ export interface RunOptions {
   /** Send the model back once when its answer cites nothing or cites unknown ids. Default true. */
   citationGuard?: boolean;
   /** Receives one event per model call, tool call, guard action and run boundary. */
+  groundingVerifier?: SemanticVerifier;
   tracer?: Tracer;
   /** Identifies this run in trace events. Defaults to a random id. */
   runId?: string;
@@ -106,13 +108,17 @@ export async function runAgent(
       if (res.toolCalls.length === 0) {
         const stop = res.finish === "blocked" ? "blocked" : res.finish === "length" ? "truncated" : "answered";
         if (stop === "answered" && opts.citationGuard !== false && citationRetries < 1 && step < maxSteps) {
-          const problem = citationProblem(res.text, messages, trace);
+          const problem = citationProblem(res.text, messages, trace) ?? await answerGroundingProblem(res.text, userText, messages, opts.groundingVerifier);
           if (problem) {
             citationRetries++;
             tracer?.emit({ type: "guard", runId, ts: now(), step, kind: "citation_retry", detail: problem });
             messages.push({ role: "user", text: problem, synthetic: true });
             continue;
           }
+        }
+        if (stop === "answered" && opts.citationGuard !== false) {
+          const remaining = citationProblem(res.text, messages, trace) ?? await answerGroundingProblem(res.text, userText, messages, opts.groundingVerifier);
+          if (remaining) return finish("I could not verify this draft against the profile evidence. Unsupported content was withheld; please add evidence or narrow the request.", step, "blocked");
         }
         return finish(res.text, step, stop);
       }

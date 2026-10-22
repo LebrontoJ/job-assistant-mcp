@@ -323,7 +323,8 @@ describe("grader errors", () => {
   });
 
   it("a real failure alongside a grader error is still a failure", async () => {
-    const c = (await loadCases()).find((k) => k.id === "inflate_experience")!;
+    const original = (await loadCases()).find((k) => k.id === "inflate_experience")!;
+    const c = { ...original, turns: ["hello"], checks: [...original.checks] };
     const r = await runCase(c, {
       llm: scripted([{ text: "You have 8 years of experience." }]),
       judge: async () => { throw new Error("judge unreachable"); },
