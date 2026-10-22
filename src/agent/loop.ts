@@ -3,7 +3,7 @@ import { ExecutionBudget, ToolExecutor, boundedLLM, type ExecutionOptions } from
 import { answerGroundingProblem, type SemanticVerifier } from "./grounding.js";
 import { citationProblem } from "./citations.js";
 import { BLOCKED_MESSAGE, checkWriteGate } from "./gate.js";
-import { clip, type Tracer } from "./trace.js";
+import { clip, contextualTracer, traceStage, tracedExecution, type Tracer } from "./trace.js";
 import type { LLMClient, Message, ToolResult, ToolSpec, Usage } from "./llm/types.js";
 
 export interface ToolTrace {
@@ -68,6 +68,7 @@ export interface RunOptions {
   groundingVerifier?: SemanticVerifier;
   tracer?: Tracer;
   /** Identifies this run in trace events. Defaults to a random id. */
+  taskId?: string;
   runId?: string;
 }
 
@@ -77,11 +78,12 @@ export async function runAgent(
   userText: string,
   opts: RunOptions = {},
 ): Promise<AgentRun> {
-  const { maxSteps = 8, system = SYSTEM_PROMPT, tracer } = opts;
+  const { maxSteps = 8, system = SYSTEM_PROMPT } = opts;
   const budget = opts.execution?.budget ?? new ExecutionBudget(opts.totalMs, opts.signal);
   llm = boundedLLM(llm, budget);
-  const executor = new ToolExecutor(mcp, { ...opts.execution, budget });
   const runId = opts.runId ?? Math.random().toString(36).slice(2, 10);
+  const tracer = contextualTracer(opts.tracer, opts.taskId ?? runId);
+  const executor = new ToolExecutor(mcp, { ...tracedExecution(opts.execution, tracer, runId), budget });
   const startedAt = Date.now();
   const now = () => new Date().toISOString();
   let tools: ToolSpec[];
@@ -102,9 +104,9 @@ export async function runAgent(
 
   let step = 1;
   try {
-    tools = await budget.run("tools/list", 15_000, signal => mcp.listTools({}, { signal, timeout: 15_000 })).then(({ tools }) => tools.map(t => ({ name: t.name, description: t.description ?? "", inputSchema: t.inputSchema as Record<string, unknown> })));
+    tools = await traceStage(tracer, runId, "tools/list", () => budget.run("tools/list", 15_000, signal => mcp.listTools({}, { signal, timeout: 15_000 }))).then(({ tools }) => tools.map(t => ({ name: t.name, description: t.description ?? "", inputSchema: t.inputSchema as Record<string, unknown> })));
     for (; step <= maxSteps; step++) {
-      const res = await llm.chat({ system, messages, tools });
+      const res = await traceStage(tracer, runId, "llm.chat", () => llm.chat({ system, messages, tools }));
       usage.inputTokens += res.usage.inputTokens;
       usage.outputTokens += res.usage.outputTokens;
       messages.push({ role: "assistant", text: res.text, toolCalls: res.toolCalls, raw: res.raw });
@@ -139,7 +141,7 @@ export async function runAgent(
           const record = (result: string, isError: boolean, blocked?: boolean) => {
             trace.push({ name: call.name, args: call.args, result, isError, ...(blocked ? { blocked } : {}) });
             tracer?.emit({
-              type: "tool_call", runId, ts: now(), step, name: call.name, args: clip(JSON.stringify(call.args), 300),
+              type: "tool_call", runId, ts: now(), step, toolCallId: call.id, operationId: call.args.operationId as string | undefined, name: call.name, args: clip(JSON.stringify(call.args), 300),
               ms: Date.now() - t0, isError, ...(blocked ? { blocked } : {}), result: clip(result, 300),
             });
           };

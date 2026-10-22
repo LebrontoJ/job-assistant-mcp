@@ -1,3 +1,4 @@
+import { contextualTracer, tracedExecution, tracedLLM, type Tracer } from './trace.js';
 import { ExecutionBudget, ToolExecutor, boundedLLM, type ExecutionOptions } from './execution.js';
 import { randomUUID } from 'node:crypto';
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -34,11 +35,33 @@ export async function readTool<T>(client: Client, name: string, args: Record<str
 }
 
 /** A bounded task over MCP tools. A report never writes to the tracker. */
-export async function analyseTask(client: Client, jdText: string, opts: { llm?: LLMClient; taskId?: string; totalMs?: number; signal?: AbortSignal; execution?: ExecutionOptions } = {}): Promise<TaskReport> {
-  const budget = opts.execution?.budget ?? new ExecutionBudget(opts.totalMs, opts.signal);
-  const executor = new ToolExecutor(client, { ...opts.execution, budget });
-  if (opts.llm) opts = { ...opts, llm: boundedLLM(opts.llm, budget) };
+export interface TaskOptions { llm?: LLMClient; taskId?: string; totalMs?: number; signal?: AbortSignal; execution?: ExecutionOptions; tracer?: Tracer }
+export async function analyseTask(client: Client, jdText: string, opts: TaskOptions = {}): Promise<TaskReport> {
   const taskId = opts.taskId ?? randomUUID();
+  const tracer = contextualTracer(opts.tracer, taskId);
+  const budget = opts.execution?.budget ?? new ExecutionBudget(opts.totalMs, opts.signal);
+  const executor = new ToolExecutor(client, { ...tracedExecution(opts.execution, tracer, taskId), budget });
+  const start = Date.now();
+  const usage = { inputTokens: 0, outputTokens: 0, calls: 0 };
+  let llm = opts.llm;
+  if (llm) {
+    const inner = tracedLLM(boundedLLM(llm, budget), tracer, taskId);
+    llm = { provider: inner.provider, model: inner.model, chat: async req => {
+      const out = await inner.chat(req); usage.calls++; usage.inputTokens += out.usage.inputTokens; usage.outputTokens += out.usage.outputTokens; return out;
+    } };
+  }
+  tracer?.emit({ type: 'run_start', runId: taskId, ts: new Date().toISOString(), provider: llm?.provider ?? 'extractive', model: llm?.model ?? 'offline', user: jdText });
+  let stoppedBecause = 'error';
+  try {
+    const report = await buildTask(client, jdText, { ...opts, taskId, llm, tracer }, executor);
+    stoppedBecause = 'answered';
+    return report;
+  } finally {
+    tracer?.emit({ type: 'run_end', runId: taskId, ts: new Date().toISOString(), ms: Date.now() - start, steps: usage.calls, stoppedBecause, inputTokens: usage.inputTokens, outputTokens: usage.outputTokens, answerChars: 0 });
+  }
+}
+async function buildTask(client: Client, jdText: string, opts: TaskOptions & { taskId: string }, executor: ToolExecutor): Promise<TaskReport> {
+  const taskId = opts.taskId;
   const jd = await readTool<ParsedJd>(client, 'parse_jd', { text: jdText }, executor);
   const match = await readTool<MatchReport>(client, 'match_resume', { jd_text: jdText }, executor);
   const evidence = new Map<string, TaskEvidence>();
@@ -68,6 +91,7 @@ export async function analyseTask(client: Client, jdText: string, opts: { llm?: 
     catch { draft = { rewrites: [], suggestions: [] }; }
     const verdicts = await Promise.all(draft.rewrites.map(c => validateClaim(c, passages, modelVerifier(opts.llm!))));
     validation.push(...verdicts);
+    for (const v of verdicts.filter(v => !v.supported)) opts.tracer?.emit({ type: "guard", runId: taskId, ts: new Date().toISOString(), step: attempt + 1, kind: "claim_rejected", detail: v.reason });
     draft.rewrites = verdicts.filter(v => v.supported).map(v => v.claim);
     draft.suggestions = extractiveDraft.suggestions;
     if (verdicts.length && verdicts.every(v => v.supported)) break;

@@ -1,10 +1,11 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { randomUUID } from "node:crypto";
 import { createInterface } from "node:readline/promises";
 import { ExecutionBudget } from "./execution.js";
 import { createLLM } from "./llm/index.js";
 import { runAgent } from "./loop.js";
-import { JsonlTracer } from "./trace.js";
+import { JsonlTracer, contextualTracer, traceStage } from "./trace.js";
 import type { Message } from "./llm/types.js";
 
 const shorten = (s: string, n = 140) => (s.length > n ? `${s.slice(0, n)}… (${s.length} chars)` : s);
@@ -20,10 +21,11 @@ async function main() {
   const tracer = process.env.TRACE_DIR
     ? new JsonlTracer(`${process.env.TRACE_DIR}/cli-${new Date().toISOString().replace(/[:.]/g, "-")}.jsonl`)
     : undefined;
+  const sessionId = randomUUID();
   let turn = 0;
   const mcp = new Client({ name: "job-assistant-cli", version: "0.1.0" });
   try {
-  await new ExecutionBudget(20_000).run("mcp.connect", 15_000, signal => mcp.connect(
+  await traceStage(contextualTracer(tracer, sessionId), sessionId, "mcp.connect", () => new ExecutionBudget(20_000).run("mcp.connect", 15_000, signal => mcp.connect(
     new StdioClientTransport({
       command: process.execPath,
       args: ["--import", "tsx", "src/server/index.ts"],
@@ -31,12 +33,12 @@ async function main() {
       stderr: "inherit",
     }),
     { signal, timeout: 15_000 },
-  ));
+  )));
 
   const oneShot = process.argv.slice(2).join(" ").trim();
   let history: Message[] = [];
   const ask = async (text: string) => {
-    const run = await runAgent(llm, mcp, text, { history, tracer, runId: `cli-t${++turn}` });
+    const run = await runAgent(llm, mcp, text, { history, tracer, taskId: sessionId, runId: `${sessionId}-t${++turn}` });
     history = run.messages;
     for (const t of run.trace) console.error(`  [tool] ${t.name}(${shorten(JSON.stringify(t.args))})${t.isError ? " -> error" : ""}`);
     console.log(run.answer || `(no answer: ${run.stoppedBecause})`);

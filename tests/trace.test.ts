@@ -14,6 +14,8 @@ import { runCase } from "../evals/runner.js";
 import { formatReport } from "../evals/report.js";
 import { connectedPair } from "./helpers.js";
 
+const core = (events: TraceEvent[]) => events.filter(e => e.type !== "stage" && e.type !== "tool_attempt");
+
 function scripted(responses: Array<Partial<ChatResponse>>): LLMClient {
   let i = 0;
   return {
@@ -34,9 +36,9 @@ describe("agent run tracing", () => {
     const { client } = await connectedPair();
     const t = new MemoryTracer();
     await runAgent(scripted([call("list_followups", { days: 7 }), { text: "Two due.", latencyMs: 80 }]), client, "What is due?", { tracer: t, runId: "r1" });
-    expect(t.events.map((e) => e.type)).toEqual(["run_start", "llm_call", "tool_call", "llm_call", "run_end"]);
+    expect(core(t.events).map((e) => e.type)).toEqual(["run_start", "llm_call", "tool_call", "llm_call", "run_end"]);
     expect(t.events.every((e) => e.runId === "r1")).toBe(true);
-    const [start, m1, tool, m2, end] = t.events as [TraceEvent, any, any, any, any];
+    const [start, m1, tool, m2, end] = core(t.events) as [TraceEvent, any, any, any, any];
     expect(start).toMatchObject({ provider: "fake", model: "fake-1", user: "What is due?" });
     expect(m1).toMatchObject({ step: 1, ms: 120, inputTokens: 10, finish: "tool_calls", toolCalls: ["list_followups"] });
     expect(tool).toMatchObject({ step: 1, name: "list_followups", isError: false });
@@ -67,7 +69,7 @@ describe("agent run tracing", () => {
     const t = new MemoryTracer();
     const boom: LLMClient = { provider: "fake", model: "m", chat: async () => { throw new Error("quota"); } };
     await expect(runAgent(boom, client, "q", { tracer: t })).rejects.toThrow("quota");
-    expect(t.events.map((e) => e.type)).toEqual(["run_start", "run_end"]);
+    expect(core(t.events).map((e) => e.type)).toEqual(["run_start", "run_end"]);
     expect(t.events.at(-1)).toMatchObject({ stoppedBecause: "error" });
   });
 
@@ -87,7 +89,7 @@ describe("tracers and helpers", () => {
     tr.emit({ ...ev, runId: "r2" });
     const events = parseTrace(await readFile(file, "utf8"));
     expect(events.map((e) => e.runId)).toEqual(["r", "r2"]);
-    expect((events[0] as any).user).toMatch(/… \(1000 chars\)$/);
+    expect((events[0] as any).user).toBe("[redacted]");
   });
 
   it("multiTracer fans out and ignores undefined", () => {
@@ -196,10 +198,10 @@ describe("eval integration", () => {
     const dir = await mkdtemp(join(tmpdir(), "ja-evtrace-"));
     const c = (await loadCases()).find((k) => k.id === "followups_week")!;
     const r = await runCase(c, { llm: scripted([call("list_followups", { days: 7 }), { text: "Contoso and Northwind are due." }]), traceDir: dir });
-    expect(r.events?.map((e) => e.type)).toEqual(["run_start", "llm_call", "tool_call", "llm_call", "run_end"]);
+    expect(core(r.events ?? []).map((e) => e.type)).toEqual(["run_start", "llm_call", "tool_call", "llm_call", "run_end"]);
     expect(r.events?.[0]?.runId).toBe("followups_week-t0");
     expect(await readdir(dir)).toEqual(["followups_week.jsonl"]);
-    expect(parseTrace(await readFile(join(dir, "followups_week.jsonl"), "utf8"))).toHaveLength(5);
+    expect(core(parseTrace(await readFile(join(dir, "followups_week.jsonl"), "utf8")))).toHaveLength(5);
     const report = formatReport({ provider: "fake", model: "fake-1", date: "d" }, [r]);
     expect(report).toContain("## Performance");
     expect(report).toContain("list_followups");

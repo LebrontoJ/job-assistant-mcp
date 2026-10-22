@@ -1,11 +1,14 @@
 import { appendFileSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
+import { failureKind, type ExecutionOptions } from "./execution.js";
+import type { LLMClient } from "./llm/types.js";
 
 /**
  * One line per thing that happened in an agent run. The shapes are flat and JSON-friendly on purpose: a trace file
  * can be read with `jq`, loaded into a notebook, or printed with `pnpm trace <file>`.
  */
-export type TraceEvent =
+export interface TraceContext { taskId?: string; toolCallId?: string; operationId?: string; attempt?: number; errorKind?: string }
+export type TraceEvent = TraceContext & (
   | { type: "run_start"; runId: string; ts: string; provider: string; model: string; user: string }
   | {
       type: "llm_call";
@@ -33,7 +36,7 @@ export type TraceEvent =
       blocked?: boolean;
       result: string;
     }
-  | { type: "guard"; runId: string; ts: string; step: number; kind: "write_blocked" | "citation_retry"; detail: string }
+  | { type: "guard"; runId: string; ts: string; step: number; kind: "write_blocked" | "citation_retry" | "claim_rejected"; detail: string }
   | {
       type: "run_end";
       runId: string;
@@ -44,7 +47,10 @@ export type TraceEvent =
       inputTokens: number;
       outputTokens: number;
       answerChars: number;
-    };
+    }
+  | { type: "stage"; runId: string; ts: string; name: string; ms: number; status: "ok" | "error" }
+  | { type: "tool_attempt"; runId: string; ts: string; toolCallId: string; name: string; attempt: number; ms: number; retrying: boolean }
+);
 
 export interface Tracer {
   emit(event: TraceEvent): void;
@@ -61,12 +67,13 @@ export class MemoryTracer implements Tracer {
 }
 
 export class JsonlTracer implements Tracer {
-  constructor(private readonly file: string) {
+  constructor(private readonly file: string, private readonly opts: { includeContent?: boolean } = {}) {
     mkdirSync(dirname(file), { recursive: true });
   }
   emit(event: TraceEvent): void {
     // Synchronous append keeps events in order even when tool calls finish concurrently.
-    appendFileSync(this.file, JSON.stringify(event) + "\n", "utf8");
+    const safe = this.opts.includeContent ? event : redactEvent(event);
+    appendFileSync(this.file, JSON.stringify(safe) + "\n", { encoding: "utf8", mode: 0o600 });
   }
 }
 
@@ -112,6 +119,12 @@ export function formatTrace(events: TraceEvent[]): string {
         break;
       case "guard":
         out.push(`${at(e)}  GUARD  step ${e.step}  ${e.kind}: ${clip(e.detail, 100)}`);
+        break;
+      case "tool_attempt":
+        out.push(`${at(e)}  ATTEMPT ${e.name} #${e.attempt} ${ms(e.ms)} [${e.toolCallId}]${e.operationId ? ` op=${e.operationId}` : ""}${e.errorKind ? ` ${e.errorKind}` : ""}${e.retrying ? " RETRY" : ""}`);
+        break;
+      case "stage":
+        out.push(`${at(e)}  STAGE  ${e.name} ${e.status} ${ms(e.ms)}${e.errorKind ? ` ${e.errorKind}` : ""}`);
         break;
       case "run_end":
         out.push(`${at(e)}  END    ${e.stoppedBecause}  ${e.steps} model call(s)  ${ms(e.ms)} total  ${e.inputTokens} in / ${e.outputTokens} out`);
@@ -188,4 +201,42 @@ export function formatStats(s: TraceStats): string[] {
   }
   out.push(`Tokens per model call: ${s.llm.calls ? Math.round(s.llm.inputTokens / s.llm.calls) : 0} in / ${s.llm.calls ? Math.round(s.llm.outputTokens / s.llm.calls) : 0} out`, "");
   return out;
+}
+
+
+export function redactEvent(event: TraceEvent): TraceEvent {
+  const safe = { ...event } as Record<string, unknown>;
+  for (const field of ['user', 'args', 'result', 'detail']) if (field in safe) safe[field] = '[redacted]';
+  return safe as unknown as TraceEvent;
+}
+export function contextualTracer(tracer: Tracer | undefined, taskId: string): Tracer | undefined {
+  return tracer ? { emit: event => tracer.emit({ ...event, taskId }) } : undefined;
+}
+export async function traceStage<T>(tracer: Tracer | undefined, runId: string, name: string, fn: () => Promise<T>): Promise<T> {
+  const start = Date.now();
+  try {
+    const result = await fn();
+    tracer?.emit({ type: 'stage', runId, ts: new Date().toISOString(), name, ms: Date.now() - start, status: 'ok' });
+    return result;
+  } catch (err) {
+    tracer?.emit({ type: 'stage', runId, ts: new Date().toISOString(), name, ms: Date.now() - start, status: 'error', errorKind: failureKind(err) });
+    throw err;
+  }
+}
+export function tracedExecution(opts: ExecutionOptions | undefined, tracer: Tracer | undefined, runId: string): ExecutionOptions {
+  return { ...opts, onAttempt: event => {
+    tracer?.emit({ type: 'tool_attempt', runId, ts: new Date().toISOString(), ...event });
+    opts?.onAttempt?.(event);
+  } };
+}
+export function tracedLLM(llm: LLMClient, tracer: Tracer | undefined, runId: string): LLMClient {
+  let calls = 0;
+  return { provider: llm.provider, model: llm.model, chat: async req => {
+    const step = ++calls;
+    const start = Date.now();
+    const out = await traceStage(tracer, runId, 'llm.chat', () => llm.chat(req));
+    tracer?.emit({ type: 'llm_call', runId, ts: new Date().toISOString(), step, ms: out.latencyMs ?? Date.now() - start, retries: out.retries,
+      inputTokens: out.usage.inputTokens, outputTokens: out.usage.outputTokens, finish: out.finish, toolCalls: out.toolCalls.map(c => c.name) });
+    return out;
+  } };
 }

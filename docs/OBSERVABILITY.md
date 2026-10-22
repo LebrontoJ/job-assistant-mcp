@@ -68,3 +68,16 @@ and tokens per call (see the `## Performance` block in the report).
 - No per-tool token attribution, no distributed tracing or OpenTelemetry export, no live dashboard.
 - Latency of the embedding API is not traced (vectors are cached on disk after the first call).
 - Traces are per process; there is no cross-run correlation beyond the run id.
+
+## Correlation and redaction (01–08 upgrade)
+
+New events carry `taskId`; tool summaries/attempts carry `toolCallId` and writes carry `operationId`.
+`tool_attempt` records each attempt, error class and retry decision. `stage` distinguishes discovery, connection,
+model and profile/embedding failures; run_end is emitted even if discovery fails. Structured JD tasks emit the same
+trace format, including rejected-claim guard events. `pnpm trace` displays attempts and stages without exposing content.
+
+JSONL files now redact user text, tool arguments/results and guard details by default. Correlation ids, tool/stage
+names, error classes, timings and token counts remain. MemoryTracer retains content for local graders; do not export
+it without sanitizing. Library callers may explicitly opt into `new JsonlTracer(file, { includeContent: true })` for
+private debugging. Existing historical files are not retroactively redacted. Embedding timings include cache lookup
+when wrapped around the caching embedder; cached vector calls can be near zero.
