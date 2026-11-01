@@ -11,7 +11,27 @@ const terms = (s: string) => new Set((normal(s).match(/[a-z][a-z0-9+#/-]*|[\u4e0
   .filter(t => !new Set(['i', 'my', 'you', 'your', 'a', 'an', 'the', 'by', 'to', 'of', 'and', 'with', 'through', 'in', 'on', 'from', 'as', 'it', 'have', 'has']).has(t))
   .map(t => synonyms[t] ?? t));
 const quantities = (s: string): string[] => normal(s).match(/\d[\d,]*(?:\.\d+)?\s*(?:%|\+?\s*(?:years?|months?|年|个月)|m\b|k\b)?|[一二三四五六七八九十百]+\s*年/g) ?? [];
-const sentences = (s: string) => s.split(/\n|(?<=[.!?。；;])\s+/).map(s => s.replace(/^[-*]\s*/, '').trim()).filter(Boolean);
+// Chinese punctuation commonly has no following space. Keep English decimal points intact.
+const sentences = (s: string) => s.split(/\n|(?<=[.!?;])\s+|(?<=[。！？；])\s*/u).map(s => s.replace(/^[-*]\s*/, '').trim()).filter(Boolean);
+// A clause can inherit a plan/negation from elsewhere in its paragraph. In that case
+// only a whole-paragraph extract is safe locally; fragments need the full-context verifier.
+const scopedContext = /尚未|未实施|未完成|未实现|未曾|从未|并未|没有|计划|打算|假设|假如|如果|拟(?:实现|开发|采用)|\b(?:not yet|did not|never|plan(?:s|ned|ning)? to|intend(?:s|ed)? to|proposed|hypothetical)\b/i;
+
+function exactExtract(paragraph: string, statement: string): boolean {
+  if (normal(paragraph) === statement) return true;
+  if (scopedContext.test(paragraph)) return false;
+  const parts = sentences(paragraph);
+  // Permit a contiguous, complete sentence span, not arbitrary substrings or skipped clauses.
+  for (let start = 0; start < parts.length; start++) {
+    let span = '';
+    for (let end = start; end < parts.length; end++) {
+      span += (span ? ' ' : '') + parts[end]!;
+      if (normal(span) === statement) return true;
+      if (normal(span).length > statement.length) break;
+    }
+  }
+  return false;
+}
 
 // Preserve word order and relation words. Coordinated redesign objects are interchangeable.
 const redesign = (_match: string, a: string, b: string) =>
@@ -28,31 +48,38 @@ export async function validateClaim(claim: Claim, sources: TaskEvidence[], verif
   const result = (supported: boolean, reason: string): ClaimVerdict => ({ claim, supported, reason });
   if (!claim.evidenceIds.length || evidence.some(e => !e)) return result(false, 'missing_or_unknown_evidence');
   const passages = evidence as TaskEvidence[];
-  const statement = normal(claim.text.replace(/\[[^\]]*\.md#\d+[^\]]*\]/g, ''));
+  const claimText = claim.text.replace(/\[[^\]]*\.md#\d+[^\]]*\]/g, '');
+  const statement = normal(claimText);
   if (!statement) return result(false, 'empty_claim');
-  const lines = passages.flatMap(e => sentences(e.text));
-  if (passages.some(e => e.text.split('\n').some(line => normal(line.replace(/^[-*]\s*/, '')) === statement)) || lines.some(line => normal(line) === statement)) return result(true, 'source_extract');
-  const wanted = terms(statement);
-  for (const quantity of quantities(statement)) {
-    const anchored = lines.filter(line => quantities(line).includes(quantity));
-    // All content terms must refer to the same event as this quantity. A semantic judge may not override this check.
-    if (!anchored.some(line => {
-      const have = terms(line);
-      return wanted.size > 0 && [...wanted].every(t => have.has(t));
-    })) return result(false, 'quantity_not_grounded_in_same_claim');
+  const paragraphs = passages.flatMap(e => e.text.split('\n').map(line => line.replace(/^[-*]\s*/, '').trim()).filter(Boolean));
+  const lines = paragraphs.flatMap(sentences);
+  if (paragraphs.some(p => exactExtract(p, statement))) return result(true, 'source_extract');
+  // Each independently stated fact must anchor its own quantities, even in a multi-sentence claim.
+  for (const part of sentences(claimText)) {
+    const wanted = terms(part);
+    const numbers = quantities(part);
+    for (const quantity of numbers) {
+      const anchored = lines.filter(line => quantities(line).includes(quantity));
+      // A semantic judge may not override borrowed quantities.
+      if (!anchored.some(line => {
+        const have = terms(line);
+        return wanted.size > 0 && [...wanted].every(t => have.has(t));
+      })) return result(false, 'quantity_not_grounded_in_same_claim');
+    }
+    // Numeric order is part of the fact, not just a set of values.
+    if (numbers.length && !lines.some(line => {
+      if (![...wanted].every(t => terms(line).has(t))) return false;
+      const sourceNumbers = quantities(line);
+      let cursor = 0;
+      return numbers.every(n => {
+        const next = sourceNumbers.indexOf(n, cursor);
+        cursor = next + 1;
+        return next !== -1;
+      });
+    })) return result(false, 'quantity_relation_changed');
   }
-  // Numeric order is part of the fact, not just a set of values.
-  if (quantities(statement).length && !lines.some(line => {
-    if (![...wanted].every(t => terms(line).has(t))) return false;
-    const sourceNumbers = quantities(line);
-    let cursor = 0;
-    return quantities(statement).every(n => {
-      const next = sourceNumbers.indexOf(n, cursor);
-      cursor = next + 1;
-      return next !== -1;
-    });
-  })) return result(false, 'quantity_relation_changed');
-  if (lines.some(line => paraphraseKey(line) === paraphraseKey(statement))) return result(true, 'conservative_paraphrase');
+  const unqualifiedLines = paragraphs.filter(p => !scopedContext.test(p)).flatMap(sentences);
+  if (unqualifiedLines.some(line => paraphraseKey(line) === paraphraseKey(statement))) return result(true, 'conservative_paraphrase');
   if (!verify) return result(false, 'semantic_verification_required');
   try { return result(await verify(claim, passages), 'semantic_verification'); }
   catch { return result(false, 'verifier_unavailable'); }

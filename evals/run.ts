@@ -40,24 +40,14 @@ async function main() {
   const stamp = new Date().toISOString();
 
   const embedding = createEmbedding({ ...process.env, ...(values.embeddings ? { EMBEDDINGS: values.embeddings } : {}) });
-  const index = await ProfileIndex.fromDir(process.env.PROFILE_DIR ?? "data/sample/profile", embedding.embedder, {
+  const profileDir = values["profile-dir"] ?? process.env.PROFILE_DIR ?? "data/sample/profile";
+  const index = await ProfileIndex.fromDir(profileDir, embedding.embedder, {
     minSimilarity: embedding.minSimilarity,
   });
-  const retrievalCases = await loadRetrievalCases();
-  const modes: SearchMode[] = embedding.embedder ? ["bm25", "dense", "hybrid"] : ["bm25"];
-  const retrievalRuns = Object.fromEntries(
-    await Promise.all(modes.map(async (m) => [m, await evalRetrieval(retrievalCases, index, { mode: m })] as const)),
-  );
-  const retrieval: RetrievalReport = {
-    modes: Object.fromEntries(modes.map((m) => [m, retrievalRuns[m]!.summary])),
-    changes: Object.fromEntries(modes.filter((m) => m !== "bm25").map((m) => [m, diffRanks(retrievalRuns.bm25!.results, retrievalRuns[m]!.results)])),
-    embedder: embedding.embedder?.id,
-  };
-
   if (flags.has("match-only")) {
     // Requirement-matching quality: word overlap alone vs word overlap plus embedding similarity.
-    const cases = await loadMatchCases();
-    const lexicalIndex = await ProfileIndex.fromDir(process.env.PROFILE_DIR ?? "data/sample/profile");
+    const cases = await loadMatchCases(values["match-cases"]);
+    const lexicalIndex = embedding.embedder ? ProfileIndex.fromChunks(index.chunks) : index;
     const lexical = score(await collectSignals(cases, lexicalIndex));
     const rows = [{ label: "keyword only", scored: lexical }];
     const names = new Map(cases.map((c) => [c.id, c.item]));
@@ -90,6 +80,17 @@ async function main() {
     return;
   }
 
+  const retrievalCases = await loadRetrievalCases(values["retrieval-cases"]);
+  const modes: SearchMode[] = embedding.embedder ? ["bm25", "dense", "hybrid"] : ["bm25"];
+  const retrievalRuns = Object.fromEntries(
+    await Promise.all(modes.map(async (m) => [m, await evalRetrieval(retrievalCases, index, { mode: m })] as const)),
+  );
+  const retrieval: RetrievalReport = {
+    modes: Object.fromEntries(modes.map((m) => [m, retrievalRuns[m]!.summary])),
+    changes: Object.fromEntries(modes.filter((m) => m !== "bm25").map((m) => [m, diffRanks(retrievalRuns.bm25!.results, retrievalRuns[m]!.results)])),
+    embedder: embedding.embedder?.id,
+  };
+
   if (flags.has("retrieval-only")) {
     console.log(formatReport({ provider: "-", model: "-", date: stamp }, [], retrieval));
     return;
@@ -115,7 +116,7 @@ async function main() {
   const filter = values.filter?.toLowerCase();
   const suite = values.suite ?? "all";
   if (!["all", "core", "extended"].includes(suite)) throw new Error(`--suite must be core, extended or all, got "${suite}"`);
-  const cases = (await loadCases()).filter(
+  const cases = (await loadCases(values["cases-dir"])).filter(
     (c) => (suite === "all" || c.suite === suite) && (!filter || c.id.includes(filter) || c.category.includes(filter)),
   );
   if (!cases.length) throw new Error("No cases match the given --suite/--filter");

@@ -17,6 +17,7 @@
     "agent": "node --import tsx src/agent/cli.ts",
     "eval": "node --import tsx evals/run.ts",
     "eval:retrieval": "node --import tsx evals/run.ts --retrieval-only",
+    "eval:profile": "node --import tsx scripts/audit-profile.ts",
     "trace": "node --import tsx src/agent/trace-cli.ts",
     "eval:freeze": "node --import tsx scripts/freeze-baseline.ts",
     "store:migrate": "node --import tsx scripts/migrate-store.ts",

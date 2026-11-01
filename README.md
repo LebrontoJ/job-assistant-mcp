@@ -65,6 +65,9 @@ Known limits: numeric requirements ("5+ years") are flagged, not computed. On th
 requirement matching from 71% to 79% (two related passages surfaced) but recognised no extra `supported` paraphrase,
 because correct and wrong matches have overlapping similarity; details in [docs/EVALS.md](docs/EVALS.md).
 
+Personal Markdown organization, source/correction records and separate offline audits are described in
+[Personal profile corpus](docs/PROFILE_CORPUS.md). Custom eval paths keep personal labels separate from the synthetic baseline.
+
 ## Quick start
 
 ```bash

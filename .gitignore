@@ -5,6 +5,8 @@ dist
 !.env.example
 # real personal data never goes in the repo; only data/sample (synthetic) is tracked
 data/profile/
+# Personal source manifests, unresolved facts and eval cases/results stay outside the index.
+data/private-profile/
 data/applications.json
 .cache/
 evals/results/*
