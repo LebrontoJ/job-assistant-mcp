@@ -8,7 +8,9 @@ export interface Chunk {
 
 const BULLET = /^\s*(?:[-*•]|\d+[.)])\s+/;
 
-/** Splits a section body into bullets and paragraphs. */
+const FENCE = /^\s*```/;
+
+/** Splits a section body into bullets, paragraphs and fenced code blocks (kept verbatim, newlines included). */
 function blocks(lines: string[]): string[] {
   const out: string[] = [];
   let para: string[] = [];
@@ -16,15 +18,28 @@ function blocks(lines: string[]): string[] {
     if (para.length) out.push(para.join(" "));
     para = [];
   };
+  let fence: string[] | null = null;
   for (const raw of lines) {
+    if (fence) {
+      fence.push(raw.trimEnd());
+      if (FENCE.test(raw)) {
+        out.push(fence.join("\n"));
+        fence = null;
+      }
+      continue;
+    }
     const line = raw.trim();
-    if (!line) flush();
+    if (FENCE.test(line)) {
+      flush();
+      fence = [raw.trimEnd()];
+    } else if (!line) flush();
     else if (BULLET.test(line)) {
       flush();
       out.push(line.replace(BULLET, "").trim());
     } else para.push(line);
   }
   flush();
+  if (fence) out.push(fence.join("\n"));
   return out;
 }
 
@@ -53,7 +68,7 @@ export function chunkMarkdown(source: string, markdown: string, maxChars = 400):
 
   let inFence = false;
   for (const line of markdown.split(/\r?\n/)) {
-    if (/^\s*```/.test(line)) inFence = !inFence;
+    if (FENCE.test(line)) inFence = !inFence;
     const h = !inFence ? line.match(/^(#{1,6})\s+(.*?)\s*#*\s*$/) : null;
     if (h) {
       emit();
