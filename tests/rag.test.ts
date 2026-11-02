@@ -39,6 +39,12 @@ describe("chunkMarkdown", () => {
     const c = chunkMarkdown("r.md", "## A\n```\n# not a heading\n```\n");
     expect(c.map((x) => x.heading)).toEqual(["A"]);
   });
+
+  it("keeps a code fence as one verbatim block", () => {
+    const c = chunkMarkdown("r.md", "## A\nintro\n```sh\n# comment\n- not a bullet\n\necho hi\n```\nafter\n");
+    expect(c).toHaveLength(1);
+    expect(c[0]?.text).toBe("intro\n```sh\n# comment\n- not a bullet\n\necho hi\n```\nafter");
+  });
 });
 
 describe("Bm25", () => {
