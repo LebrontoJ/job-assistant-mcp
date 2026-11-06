@@ -186,12 +186,12 @@ export function createServer(store: ApplicationStore, profile?: ProfileIndex, op
         "whether the profile has supporting evidence (with chunk ids), and which JD skills appear or are missing. " +
         "Read-only; the result is a retrieval signal for you to interpret, not a final verdict. 'weak' means a related " +
         "passage exists, not that the requirement is met; requirements with a quantity (years) never exceed 'weak'.",
-      inputSchema: { jd_text: z.string().trim().min(20).max(50_000).describe("The full job description text.") },
+      inputSchema: { jd_text: z.string().trim().min(20).max(50_000).describe("The full job description text."), include_evidence: z.boolean().optional().describe("Return bounded complete evidence for application-layer assessment; no model judgment runs here.") },
     },
-    async ({ jd_text }, extra) => {
+    async ({ jd_text, include_evidence }, extra) => {
       if (!profile?.size) return noProfile();
       const result = await parse(jd_text, extra);
-      return json({ ...await matchProfile(result.data, profile, opts.match), parsing: result.meta });
+      return json({ ...await matchProfile(result.data, profile, { ...opts.match, includeEvidence: include_evidence === true }), parsing: result.meta });
     },
   );
 
