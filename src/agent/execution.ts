@@ -46,6 +46,7 @@ export interface ToolAttempt {
   toolCallId: string; name: string; operationId?: string; attempt: number; ms: number; errorKind?: FailureKind; retrying: boolean;
 }
 export interface ExecutionOptions {
+  metadata?: { taskId: string; runId?: string };
   budget?: ExecutionBudget; timeoutMs?: number; maxAttempts?: number; retryDelayMs?: number;
   onAttempt?: (event: ToolAttempt) => void;
 }
@@ -59,7 +60,7 @@ export class ToolExecutor {
     for (let attempt = 1; ; attempt++) {
       const start = Date.now();
       try {
-        const out = await this.budget.run(name, this.opts.timeoutMs ?? 15_000, signal => this.client.callTool({ name, arguments: args }, undefined, { signal, timeout: this.opts.timeoutMs ?? 15_000 }));
+        const out = await this.budget.run(name, this.opts.timeoutMs ?? 15_000, signal => this.client.callTool({ name, arguments: args, _meta: { ...this.opts.metadata, toolCallId } }, undefined, { signal, timeout: this.opts.timeoutMs ?? 15_000 }));
         if (out.isError) {
           const text = JSON.stringify(out.content);
           const kind = failureKind(text);

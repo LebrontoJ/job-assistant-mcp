@@ -26,6 +26,15 @@ describe("matchProfile", () => {
     expect(r.summary.skillsMissing).not.toContain("PostgreSQL");
   });
 
+  it("caps Chinese duration requirements at weak even when retrieval matches every word", async () => {
+    const requirement = "需要3年以上工作经验";
+    const idx = ProfileIndex.fromMarkdown({ "r.md": `## Work\n${requirement}` });
+    const r = await matchProfile({ ...jd, requirements: [requirement], niceToHave: [], skills: [] }, idx);
+    expect(r.items[0]?.coverage).toBe(1);
+    expect(r.items[0]?.support).toBe("weak");
+    expect(r.items[0]?.note).toMatch(/quantity/);
+  });
+
   it("reports no evidence for an unrelated requirement", async () => {
     const idx = ProfileIndex.fromMarkdown({ "r.md": "## Work\n- Wrote Python services" });
     const r = await matchProfile(

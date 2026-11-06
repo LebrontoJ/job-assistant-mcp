@@ -14,7 +14,7 @@ your own profile, and a small eval harness that tells you whether a change made 
 
 | MCP tool | Reads/writes | Notes |
 |---|---|---|
-| `parse_jd` | read | Deterministic JD structuring (sections, years, work mode, skills). No model inside the server. |
+| `parse_jd` | read | Gemini JD extraction with source validation and deterministic rule fallback (offline mode stays local). |
 | `list_applications` | read | Filter by status / company. |
 | `list_followups` | read | Open applications with a follow-up due in N days (overdue included). |
 | `search_profile` | read | BM25 search over your Markdown profile; returns passages with citable chunk ids. Works for English and Chinese. |
@@ -131,3 +131,25 @@ data/sample/  synthetic resume, JD, applications
 evals/        case files, graders, runner, retrieval metrics
 tests/        vitest; the agent loop is tested against the real server with a scripted model
 ```
+
+### JD parsing
+
+`parse_jd` and `match_resume` share a Gemini structured-output parser and validated cache.
+Only JD text is sent for extraction; personal Markdown chunking and source citations are unchanged.
+`JD_PARSER_MODE=auto` (default) uses `GEMINI_API_KEY`; a missing key, API error, invalid output or
+10s timeout returns the existing rule-based result. `JD_PARSER_MODE=rules` forces local parsing.
+The workbench's `APP_MODE=extractive` always uses local rules. Use `APP_MODE=live` for Gemini parsing
+and model drafting. Parser model and budget are independent of the agent: `JD_PARSER_MODEL` and
+`JD_PARSER_TIMEOUT_MS` (1–12000ms). The stdio server also loads `.env` without replacing explicit environment variables.
+
+No automatic model switch or provider retry is performed. Free access depends on the configured Google
+project's quota/billing tier. `JD_PARSER_CACHE_DIR=off` disables disk caching; otherwise validated JD extracts
+are stored under `.cache/parsing/jd`. Clear that directory to remove stored extracts; restart to clear memory.
+Rule fallbacks are shared in memory for 30s, then API extraction can recover.
+Tool results include `parsing` metadata; the workbench shows the method and fallback reason. Traces record
+`jd_parse` events with API counts/tokens separately from agent calls. Exact extracts are checked against
+source text, but source presence alone cannot prove correct interpretation of negation or mandatory/preferred wording.
+
+Run `pnpm eval:jd` for the labelled synthetic rule baseline and `pnpm eval:jd --live` for a live comparison.
+The latter explicitly calls the configured Gemini API; automatic tests use fake SDK responses only.
+See [the implementation plan](docs/GEMINI_PARSING_PLAN.md) for scope and validation details.

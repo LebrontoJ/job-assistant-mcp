@@ -10,7 +10,7 @@ Non-goals: scraping job boards, interview prep, salary analysis.
 
 ## Design decisions
 
-- **Server is model-free.** Tools return structured, checkable data; the agent reasons over it.
+- **JD extraction is Gemini-first with rule fallback.** The configured server validates source-backed structured output; offline mode uses the existing deterministic parser. Matching remains retrieval-based and the agent interprets fit. Personal Markdown chunking is unchanged. See [GEMINI_PARSING_PLAN.md](GEMINI_PARSING_PLAN.md).
 - **Writes are gated.** Write tools preview unless `confirm=true`; evals test that the agent never confirms on its own.
 - **Provider-neutral model layer.** `LLMClient` + adapters (Gemini first, Claude later). Tool schemas are defined once (MCP `tools/list`) and translated per adapter.
 - **RAG stays small.** Markdown profile, heading-based chunks (200-400 chars), BM25 first then local embeddings (no API key needed), SQLite transactional storage, answers must cite chunks.

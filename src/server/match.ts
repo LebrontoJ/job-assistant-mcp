@@ -64,7 +64,7 @@ const excerpt = (text: string, n = 160) => (text.length > n ? `${text.slice(0, n
 
 /** "5+ years", "at least 3 ...": a quantity that matching words cannot verify. */
 export const isQuantitative = (item: string): boolean =>
-  /\b\d+\s*\+?\s*(?:years?|yrs?|months?)\b|\bat least\s+\d+|\b\d+\s*\+/i.test(item);
+  /\b\d+\s*\+?\s*(?:years?|yrs?|months?)\b|\bat least\s+\d+|\b\d+\s*\+|(?:\d+|[零一二三四五六七八九十百两]+)\s*(?:[-–至到]\s*\d+)?\s*(?:年|个月)/i.test(item);
 
 export interface SupportSignals {
   coverage: number;

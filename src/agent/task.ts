@@ -1,3 +1,4 @@
+import type { ParseMeta } from '../parsing/types.js';
 import { contextualTracer, tracedExecution, tracedLLM, type Tracer } from './trace.js';
 import { ExecutionBudget, ToolExecutor, boundedLLM, type ExecutionOptions } from './execution.js';
 import { randomUUID } from 'node:crypto';
@@ -18,6 +19,7 @@ export type TaskDraft = z.infer<typeof DraftSchema>;
 export interface TaskReport {
   taskId: string;
   jd: ParsedJd;
+  parsing?: ParseMeta;
   requirements: MatchReport['items'];
   missingSkills: string[];
   evidence: TaskEvidence[];
@@ -62,7 +64,7 @@ export async function analyseTask(client: Client, jdText: string, opts: TaskOpti
 }
 async function buildTask(client: Client, jdText: string, opts: TaskOptions & { taskId: string }, executor: ToolExecutor): Promise<TaskReport> {
   const taskId = opts.taskId;
-  const jd = await readTool<ParsedJd>(client, 'parse_jd', { text: jdText }, executor);
+  const { parsing, ...jd } = await readTool<ParsedJd & { parsing?: ParseMeta }>(client, 'parse_jd', { text: jdText }, executor);
   const match = await readTool<MatchReport>(client, 'match_resume', { jd_text: jdText }, executor);
   const evidence = new Map<string, TaskEvidence>();
   // Fetch complete passages, rather than treating match_resume's truncated excerpts as complete facts.
@@ -100,6 +102,6 @@ async function buildTask(client: Client, jdText: string, opts: TaskOptions & { t
     validation.push(...await Promise.all(draft.rewrites.map(c => validateClaim(c, passages))));
     draft.rewrites = validation.filter(v => v.supported).map(v => v.claim);
   }
-  return { taskId, jd, requirements: match.items, missingSkills: match.summary.skillsMissing, evidence: passages, draft, validation,
+  return { taskId, jd, parsing, requirements: match.items, missingSkills: match.summary.skillsMissing, evidence: passages, draft, validation,
     limitations: ['Requirement labels are retrieval signals; inspect the quoted evidence. Missing evidence does not prove missing ability.', 'Years of experience are not calculated.'] };
 }

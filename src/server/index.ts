@@ -1,3 +1,4 @@
+import { createJdParser } from '../parsing/factory.js';
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { randomUUID } from "node:crypto";
 import { JsonlTracer, contextualTracer, traceStage } from "../agent/trace.js";
@@ -8,13 +9,15 @@ import { ProfileIndex } from "../rag/index.js";
 import { ApplicationStore } from "../store/applications.js";
 import { createServer } from "./server.js";
 
+try { process.loadEnvFile('.env'); } catch { /* Explicit environment is also supported. */ }
 const file = resolve(process.env.APPLICATIONS_FILE ?? "data/sample/applications.json");
 const profileDir = resolve(process.env.PROFILE_DIR ?? "data/sample/profile");
 const embedding = createEmbedding();
 const startupId = randomUUID();
-const tracer = contextualTracer(process.env.TRACE_DIR ? new JsonlTracer(resolve(process.env.TRACE_DIR, `startup-${startupId}.jsonl`)) : undefined, startupId);
+const traceSink = process.env.TRACE_DIR ? new JsonlTracer(resolve(process.env.TRACE_DIR, `server-${startupId}.jsonl`)) : undefined;
+const tracer = contextualTracer(traceSink, startupId);
 const profile = await traceStage(tracer, startupId, "profile.index", () => ProfileIndex.fromDir(profileDir, tracedEmbedder(embedding.embedder, tracer, startupId), { minSimilarity: embedding.minSimilarity }));
-const server = createServer(new ApplicationStore(file), profile, { match: { semantic: embedding.matchSemantic } });
+const server = createServer(new ApplicationStore(file), profile, { match: { semantic: embedding.matchSemantic }, jdParser: createJdParser(process.env, { offline: process.env.APP_MODE === 'extractive' }), tracer: traceSink });
 
 // stdout carries the MCP protocol; anything human-readable must go to stderr.
 await server.connect(new StdioServerTransport());

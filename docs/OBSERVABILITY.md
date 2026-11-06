@@ -83,3 +83,11 @@ private debugging. Existing historical files are not retroactively redacted. Emb
 when wrapped around the caching embedder; cached vector calls can be near zero.
 
 Structured-task performance summaries group `tool_attempt` events by run/call id. A recovered retry counts as one successful logical call; a final failed attempt counts as an error. Where a `tool_call` event exists, its complete duration is used once. Otherwise duration is the sum of attempt execution times (retry backoff excluded). CLI semantic validation is recorded as a bounded `grounding` stage.
+
+## JD extraction
+
+`jd_parse` records method, model, schema/prompt version, cache hit, elapsed time, API call count,
+reported token usage and a controlled fallback reason. The server propagates the host task/tool ids
+from MCP metadata, so extraction inside a tool is visible. No JD or SDK error body is included.
+`pnpm trace` shows these events and summarizes parser calls separately from agent calls. Reused results
+count zero additional API calls/tokens. Failed requests without provider usage metadata report zero known tokens.
