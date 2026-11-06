@@ -1,3 +1,4 @@
+import { failureKind, type FailureKind } from '../agent/execution.js';
 import { z } from 'zod';
 import type { LLMClient } from '../agent/llm/types.js';
 import { isQuantitative } from '../server/match.js';
@@ -11,7 +12,7 @@ Cite exact, contiguous quotes from supplied sources (sourceId + quote), includin
 Return JSON only with shape {"items":[{"requirementId":"id","criteria":[{"criterionId":"id","verdict":"supported|partial|insufficient|contradicted","evidence":[{"sourceId":"id","quote":"verbatim"}],"reason":"explanation","missingInformation":["needed fact"]}]}]}.`;
 export const assessmentJsonSchema = z.toJSONSchema(AssessmentOutputSchema) as Record<string, unknown>;
 
-export interface AssessmentResult { items: AssessedRequirement[]; rejected: string[] }
+export interface AssessmentResult { items: AssessedRequirement[]; rejected: string[]; failure?: FailureKind }
 /** Deterministic integrity checks. Quote presence cannot prove semantic entailment. */
 export function validateAssessment(value: unknown, bundle: EvidenceBundle, requirements: Requirement[]): AssessmentResult {
   const output = AssessmentOutputSchema.parse(value);
@@ -56,16 +57,24 @@ export async function assessBatch(llm: LLMClient, bundle: EvidenceBundle, requir
   const accepted = new Map<string, AssessedRequirement>();
   let pending = requirements;
   let rejected: string[] = [];
+  let failure: FailureKind | undefined;
   for (let attempt = 0; attempt < 2 && pending.length; attempt++) {
-    const response = await llm.chat({ system: ASSESS_SYSTEM, responseSchema: assessmentJsonSchema, tools: [],
-      messages: [{ role: 'user', text: JSON.stringify({ ...assessmentInput(bundle, pending), rejected }) }] });
-    if (response.finish !== 'stop' || response.toolCalls.length) throw new Error(`Assessment did not complete: ${response.finish}`);
-    let validated: AssessmentResult;
-    try { validated = validateAssessment(JSON.parse(response.text.replace(/^```(?:json)?\s*|\s*```$/g, '')), bundle, pending); }
-    catch { rejected = ['Invalid structured assessment or unknown requirement ids']; continue; }
-    rejected = validated.rejected;
-    for (const item of validated.items) if (item.assessmentStatus === 'assessed') accepted.set(item.requirement.id, item);
-    pending = pending.filter(r => !accepted.has(r.id));
+    try {
+      const response = await llm.chat({ system: ASSESS_SYSTEM, responseSchema: assessmentJsonSchema, tools: [],
+        messages: [{ role: 'user', text: JSON.stringify({ ...assessmentInput(bundle, pending), rejected }) }] });
+      if (response.finish !== 'stop' || response.toolCalls.length) throw new Error(`Assessment did not complete: ${response.finish}`);
+      let validated: AssessmentResult;
+      try { validated = validateAssessment(JSON.parse(response.text.replace(/^```(?:json)?\s*|\s*```$/g, '')), bundle, pending); }
+      catch { rejected = ['Invalid structured assessment or unknown requirement ids']; continue; }
+      rejected = validated.rejected;
+      for (const item of validated.items) if (item.assessmentStatus === 'assessed') accepted.set(item.requirement.id, item);
+      pending = pending.filter(r => !accepted.has(r.id));
+    } catch (error) {
+      failure = failureKind(error);
+      if (failure === 'cancelled') throw error;
+      rejected.push(`Assessment interrupted: ${failure}`);
+      break;
+    }
   }
-  return { items: requirements.map(requirement => accepted.get(requirement.id) ?? { requirement, verdict: null, assessmentStatus: 'failed', criteria: [] }), rejected };
+  return { items: requirements.map(requirement => accepted.get(requirement.id) ?? { requirement, verdict: null, assessmentStatus: failure === 'timeout' ? 'timeout' : 'failed', criteria: [] }), rejected, failure };
 }

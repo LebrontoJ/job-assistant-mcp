@@ -60,6 +60,9 @@ export async function analyseTask(client: Client, jdText: string, opts: TaskOpti
   let stoppedBecause = 'error';
   try {
     const report = await buildTask(client, jdText, { ...opts, taskId, llm, tracer, execution: { ...opts.execution, budget } }, executor);
+    usage.calls += report.assessment.meta.modelCalls;
+    usage.inputTokens += report.assessment.meta.inputTokens;
+    usage.outputTokens += report.assessment.meta.outputTokens;
     stoppedBecause = 'answered';
     return report;
   } finally {
@@ -75,8 +78,16 @@ async function buildTask(client: Client, jdText: string, opts: TaskOptions & { t
   const bundle = match.evidenceBundle ?? await collectEvidence(jd, search);
   const extra = (!match.evidenceBundle || !bundle.packets.length) ? await search(jd.skills.join(' ') || jdText.slice(0, 300), 3) : [];
   if (!match.evidenceBundle) for (const p of bundle.packets) addSources(bundle, p.requirement.id, extra);
-  const assessment = await runMatching(bundle, { ...opts.matching, tracer: opts.tracer, taskId, budget: opts.execution?.budget,
-    search: (query, k, signal) => signal.aborted ? Promise.reject(signal.reason) : search(query, k) });
+  let matchingBudget = opts.execution?.budget;
+  const reserve = opts.llm ? 60_000 : 0;
+  const canAssess = !matchingBudget || matchingBudget.remaining() > reserve;
+  if (canAssess && matchingBudget) matchingBudget = matchingBudget.child(opts.matching?.totalMs ?? 90_000, reserve);
+  const assessment = await runMatching(bundle, { ...opts.matching, ...(canAssess ? {} : { llm: undefined }), tracer: opts.tracer, taskId, budget: matchingBudget, signal: opts.signal,
+    search: async (query, k, signal) => {
+      const searchExecutor = new ToolExecutor(client, { ...tracedExecution(opts.execution, opts.tracer, taskId),
+        budget: new ExecutionBudget(Math.max(1, Math.min(15_000, matchingBudget?.remaining() ?? 15_000)), signal) });
+      return (await readTool<{ hits: TaskEvidence[] }>(client, 'search_profile', { query, k }, searchExecutor)).hits;
+    } });
   const evidence = new Map<string, TaskEvidence>(assessment.sources.map(s => [s.id, s]));
   for (const hit of extra) evidence.set(hit.id, EvidenceSchema.parse(hit));
   const passages = [...evidence.values()];

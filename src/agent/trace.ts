@@ -49,6 +49,7 @@ export type TraceEvent = TraceContext & (
       outputTokens: number;
       answerChars: number;
     }
+  | { type: "match_assessment"; runId: string; ts: string; requirementId: string; status: string; verdict: string | null }
   | { type: "match_search"; runId: string; ts: string; requirementId?: string; round: number; newSources: number; blocked: boolean; isError: boolean; ms: number }
   | ({ type: "jd_parse"; runId: string; ts: string } & ParseMeta)
   | { type: "stage"; runId: string; ts: string; name: string; ms: number; status: "ok" | "error" }
@@ -128,6 +129,9 @@ export function formatTrace(events: TraceEvent[]): string {
         break;
       case "jd_parse":
         out.push(`${at(e)}  JD     ${e.method}${e.model ? `/${e.model}` : ''} ${ms(e.ms)}${e.cacheHit ? ' CACHE' : ''} ${e.apiCalls} API call(s) ${e.inputTokens} in / ${e.outputTokens} out${e.fallbackReason ? ` fallback=${e.fallbackReason}` : ''}`);
+        break;
+      case "match_assessment":
+        out.push(`${at(e)}  ASSESS ${e.requirementId} ${e.status} ${e.verdict ?? "unassessed"}`);
         break;
       case "match_search":
         out.push(`${at(e)}  MATCH  ${e.requirementId ?? "unknown"} round ${e.round} ${e.blocked ? "BLOCKED" : e.isError ? "ERROR" : `+${e.newSources} sources`} ${ms(e.ms)}`);
