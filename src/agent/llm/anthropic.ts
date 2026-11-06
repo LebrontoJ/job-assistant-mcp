@@ -103,7 +103,7 @@ export class AnthropicClient implements LLMClient {
       system: req.system,
       messages: toMessages(req.messages),
       ...(req.tools.length ? { tools: toTools(req.tools) } : {}),
-      ...(this.opts.effort ? { output_config: { effort: this.opts.effort } } : {}),
+      ...((this.opts.effort || req.responseSchema) ? { output_config: { ...(this.opts.effort ? { effort: this.opts.effort } : {}), ...(req.responseSchema ? { format: { type: "json_schema", schema: req.responseSchema } } : {}) } } : {}),
     };
 
     const useFallback = this.opts.fallback ?? false;

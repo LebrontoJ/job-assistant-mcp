@@ -48,3 +48,35 @@ describe('complete evidence collection', () => {
     expect(enriched.evidenceBundle?.sources[0]?.text.length).toBeGreaterThan(160);
   });
 });
+
+import { assessBatch, validateAssessment } from '../src/matching/assessor.js';
+import type { LLMClient } from '../src/agent/llm/types.js';
+const fixtureBundle = () => collectEvidence({ requirements: ['Built Python services'], niceToHave: [] }, async () => [{ id: 'p', source: '', heading: '', text: 'Built Python services.' }]);
+const outputFor = (bundle: Awaited<ReturnType<typeof fixtureBundle>>, over: object = {}) => ({ items: bundle.packets.map(p => ({ requirementId: p.requirement.id, criteria: p.requirement.criteria.map(c => ({ criterionId: c.id, verdict: 'supported', evidence: [{ sourceId: 'p', quote: 'Built Python services.' }], reason: 'Direct evidence', missingInformation: [], ...over })) })) });
+describe('structured assessment host validation', () => {
+  it('accepts real quotes and rejects fabricated quotes, unknown sources, omissions and duplicates', async () => {
+    const bundle = await fixtureBundle();
+    const requirements = bundle.packets.map(p => p.requirement);
+    expect(validateAssessment(outputFor(bundle), bundle, requirements).items[0]?.verdict).toBe('supported');
+    for (const evidence of [[{ sourceId: 'unknown', quote: 'Built Python services.' }], [{ sourceId: 'p', quote: 'Led production operations.' }], []]) {
+      expect(validateAssessment(outputFor(bundle, { evidence }), bundle, requirements).items[0]?.verdict).toBeNull();
+    }
+    expect(validateAssessment({ items: [] }, bundle, requirements).items[0]?.assessmentStatus).toBe('failed');
+    const output = outputFor(bundle); output.items.push(output.items[0]!);
+    expect(validateAssessment(output, bundle, requirements).items[0]?.verdict).toBeNull();
+  });
+  it('does not claim verified years from a model verdict', async () => {
+    const bundle = await collectEvidence({ requirements: ['3 years Python'], niceToHave: [] }, async () => [{ id: 'p', source: '', heading: '', text: 'Built Python services.' }]);
+    expect(validateAssessment(outputFor(bundle), bundle, bundle.packets.map(p => p.requirement)).items[0]?.verdict).toBe('partial');
+  });
+  it('repairs malformed output once without accepting fabricated evidence', async () => {
+    const bundle = await fixtureBundle();
+    let calls = 0;
+    const llm: LLMClient = { provider: 'test', model: 'test', chat: async req => {
+      expect(req.responseSchema).toBeDefined(); calls++;
+      return { text: calls === 1 ? 'invalid' : JSON.stringify(outputFor(bundle)), finish: 'stop', toolCalls: [], usage: { inputTokens: 1, outputTokens: 1 } };
+    } };
+    expect((await assessBatch(llm, bundle, bundle.packets.map(p => p.requirement))).items[0]?.verdict).toBe('supported');
+    expect(calls).toBe(2);
+  });
+});
