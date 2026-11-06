@@ -28,11 +28,11 @@ export class ExecutionBudget {
     if (!this.remaining()) throw new ExecutionError('timeout', 'Task budget exhausted');
   }
   /** A bounded phase inherits cancellation and can reserve time for subsequent work. */
-  child(totalMs: number, reserveMs = 0): ExecutionBudget {
+  child(totalMs: number, reserveMs = 0, signal?: AbortSignal): ExecutionBudget {
     this.assertActive();
     const available = Math.min(totalMs, this.remaining() - reserveMs);
     if (available <= 0) throw new ExecutionError('timeout', 'No budget left for this phase');
-    return new ExecutionBudget(available, this.signal);
+    return new ExecutionBudget(available, this.signal && signal ? AbortSignal.any([this.signal, signal]) : signal ?? this.signal);
   }
   async run<T>(label: string, timeoutMs: number, fn: (signal: AbortSignal) => Promise<T>): Promise<T> {
     if (this.signal?.aborted) throw new ExecutionError('cancelled', `${label}: cancelled`);

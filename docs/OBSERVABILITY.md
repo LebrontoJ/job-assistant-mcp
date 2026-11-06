@@ -91,3 +91,5 @@ reported token usage and a controlled fallback reason. The server propagates the
 from MCP metadata, so extraction inside a tool is visible. No JD or SDK error body is included.
 `pnpm trace` shows these events and summarizes parser calls separately from agent calls. Reused results
 count zero additional API calls/tokens. Failed requests without provider usage metadata report zero known tokens.
+
+Requirement matching adds `match_assessment` events (requirement id, verdict/status) and `match_search` events (requirement/call id, round, added-source count, duration, error/block flags). Neither event contains profile text or search queries. Matching model calls use the existing bounded model/stage events and are included in the structured task's total usage. Cache replays add zero incremental model usage. CLI trace timelines display the new event types.

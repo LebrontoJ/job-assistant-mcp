@@ -50,3 +50,7 @@ with response caching and rate-limit-aware concurrency, so the same suite compar
 
 Optional later work: live Claude verification, local embedder, exact date-based experience calculation, stronger semantic verification,
 Pensum integration, priced-model cost estimates and OpenTelemetry export. These are not prerequisites for using the local app.
+
+## Requirement matching upgrade
+
+The application now supports retrieval-only, structured assessment and bounded read-only matching-agent modes, full requirement evidence packets, explicit per-item judgments and matching-specific synthetic evaluations. See [RESUME_MATCHING.md](RESUME_MATCHING.md). Live same-suite repeated comparisons and independent labelling remain required before claiming model-quality improvements.

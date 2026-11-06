@@ -102,3 +102,10 @@ describe('matching recovery, cancellation and accounting', () => {
     expect(() => child.assertActive()).toThrow('cancelled');
   });
 });
+
+it('combines a supplied parent budget with an independently supplied cancellation signal', async () => {
+  const bundle = await collectEvidence({ requirements: ['Python'], niceToHave: [] }, async () => []);
+  const controller = new AbortController();
+  const llm: LLMClient = { provider: 'test', model: 'cancel-parent', chat: async () => { controller.abort(); return new Promise(() => {}); } };
+  await expect(runMatching(bundle, { mode: 'assessment', llm, budget: new ExecutionBudget(1000), signal: controller.signal })).rejects.toThrow(/cancel/i);
+});

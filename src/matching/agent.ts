@@ -22,7 +22,7 @@ export async function runMatching(input: EvidenceBundle, opts: MatchingOptions =
   const started = Date.now();
   const mode = opts.mode ?? 'retrieval';
   const bundle = structuredClone(input);
-  const budget = opts.budget ?? new ExecutionBudget(opts.totalMs ?? 90_000, opts.signal);
+  const budget = opts.budget ? opts.budget.child(opts.totalMs ?? 90_000, 0, opts.signal) : new ExecutionBudget(opts.totalMs ?? 90_000, opts.signal);
   budget.assertActive();
   const taskId = opts.taskId ?? randomUUID();
   const tracer = contextualTracer(opts.tracer, taskId);
@@ -79,7 +79,9 @@ export async function runMatching(input: EvidenceBundle, opts: MatchingOptions =
   for (let round = 1; round <= maxRounds && meta.searches < maxSearches; round++) {
     const unresolved = items.filter(i => i.assessmentStatus !== 'context_limited' && i.verdict !== 'supported' && i.verdict !== 'contradicted');
     if (!unresolved.length) break;
-    messages.push({ role: 'user', text: JSON.stringify({ ...assessmentInput(bundle, unresolved.map(i => i.requirement)), assessments: unresolved, remainingSearches: maxSearches - meta.searches }) });
+    // Rebuild from trusted accumulated state instead of repeatedly replaying full evidence/tool payloads.
+    messages.length = 0;
+    messages.push({ role: 'user', text: JSON.stringify({ ...assessmentInput(bundle, unresolved.map(i => i.requirement)), assessments: unresolved, attemptedQueries: [...queries], remainingSearches: maxSearches - meta.searches }) });
     try {
       const response = await llm.chat({ system: PLAN_SYSTEM, messages, tools: [tool] });
       if (!response.toolCalls.length) { meta.stoppedBecause = response.finish === 'stop' ? 'no_more_queries' : response.finish; break; }
@@ -122,5 +124,6 @@ export async function runMatching(input: EvidenceBundle, opts: MatchingOptions =
     }
   }
   if (meta.stoppedBecause !== 'timeout' && items.some(i => i.verdict !== 'supported' && i.verdict !== 'contradicted') && (meta.searches >= maxSearches || meta.rounds >= maxRounds)) meta.stoppedBecause = 'search_limit';
+  if (meta.stoppedBecause === 'timeout' && items.every(i => i.assessmentStatus === 'assessed')) meta.stoppedBecause = 'completed';
   return finish();
 }

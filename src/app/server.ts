@@ -64,7 +64,7 @@ export function createApp(opts: AppOptions) {
         res.end(bytes); return;
       }
       if (req.method === 'GET' && path === '/api/config') {
-        send(res, 200, { token, mode: opts.llm ? 'live' : 'extractive', provider: opts.llm?.provider, model: opts.llm?.model, statuses: STATUSES }); return;
+        send(res, 200, { token, mode: opts.llm ? 'live' : 'extractive', provider: opts.llm?.provider, model: opts.llm?.model, matching: { mode: opts.matching?.mode ?? 'retrieval', provider: opts.matching?.llm?.provider, model: opts.matching?.llm?.model }, statuses: STATUSES }); return;
       }
       if (req.headers['x-app-token'] !== token) throw new HttpError(403, 'Missing session token. Reload the page.');
       // Keep report/approval memory bounded; durable write outcomes remain in SQLite.

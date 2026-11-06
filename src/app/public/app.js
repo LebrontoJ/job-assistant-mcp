@@ -19,8 +19,10 @@ function options(select, value) {
   select.replaceChildren(...config.statuses.map(status => { const option = el('option', labels[status] ?? status); option.value = status; option.selected = status === value; return option; }));
 }
 function section(title) { const node = el('section', undefined, 'report-section'); node.append(el('h3', title)); return node; }
+function showMode(matchingMode) { $('mode').textContent = `${config.mode === 'live' ? `草稿模型 · ${config.model}` : '资料原文摘录'} · 匹配：${{ retrieval: '仅检索', assessment: '结构化判断', agent: '补检 Agent' }[matchingMode]}`; }
 function showReport(data) {
   report = data;
+  showMode(data.assessment?.mode ?? config.matching?.mode ?? 'retrieval');
   $('empty').hidden = true; $('report').hidden = false; $('report').replaceChildren();
   $('report-status').textContent = `${data.requirements.length} 条岗位要求`;
   if (data.parsing) {
@@ -70,7 +72,7 @@ function showReport(data) {
   if (!data.requirements.length) requirementSection.append(el('p', '未识别到独立要求。请补充职责或要求部分。', 'muted'));
   $('report').append(requirementSection);
   const drafts = section('02 / 可采用的经历表达');
-  drafts.append(el('p', config.mode === 'live' ? '仅展示通过证据校验的改写。语义校验仍可能出错，请人工核对。' : '离线模式展示原文摘录，不进行模型改写。', 'muted'));
+  drafts.append(el('p', data.draftStatus === 'unavailable' ? '草稿生成暂不可用；已保留岗位证据判断，可稍后重试。' : data.draftStatus === 'generated' ? '仅展示通过证据校验的改写。语义校验仍可能出错，请人工核对。' : '以下展示原文摘录，不进行模型改写。', 'muted'));
   for (const item of data.draft.rewrites) {
     const bullet = el('div', undefined, 'bullet'); bullet.append(el('div', item.text));
     for (const id of item.evidenceIds) { const link = el('a', `[${id}]`, 'citation'); link.href = `#source-${data.evidence.findIndex(e => e.id === id)}`; bullet.append(link); }
@@ -190,7 +192,7 @@ $('refresh').addEventListener('click', () => refreshBoard().catch(error => notic
 (async () => {
   try {
     const res = await fetch('/api/config'); if (!res.ok) throw new Error('无法连接本地服务'); config = await res.json();
-    $('mode').textContent = config.mode === 'live' ? `实时模型 · ${config.model}` : '离线模式 · 资料摘录';
+    showMode(config.matching?.mode ?? 'retrieval');
     options($('new-status'), 'wishlist'); await refreshBoard();
   } catch (error) { notice(error.message, true); $('analyse').disabled = true; }
 })();
