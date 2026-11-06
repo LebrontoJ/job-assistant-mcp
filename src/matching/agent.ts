@@ -26,7 +26,7 @@ export async function runMatching(input: EvidenceBundle, opts: MatchingOptions =
   budget.assertActive();
   const taskId = opts.taskId ?? randomUUID();
   const tracer = contextualTracer(opts.tracer, taskId);
-  const meta: MatchAssessment['meta'] = { provider: opts.llm?.provider, model: opts.llm?.model, cacheHit: false, modelCalls: 0, inputTokens: 0, outputTokens: 0, searches: 0, rounds: 0, ms: 0, stoppedBecause: 'retrieval_only' };
+  const meta: MatchAssessment['meta'] = { provider: opts.llm?.provider, model: opts.llm?.model, cacheHit: false, modelCalls: 0, inputTokens: 0, outputTokens: 0, searches: 0, rounds: 0, executionErrors: 0, ms: 0, stoppedBecause: 'retrieval_only' };
   let items: AssessedRequirement[] = bundle.packets.map(p => ({ requirement: p.requirement, verdict: null, assessmentStatus: p.retrievalStatus === 'context_limited' ? 'context_limited' : 'unassessed', criteria: [] }));
   const cacheKey = digest({ version: MATCH_VERSION, mode, bundle: input, provider: opts.llm?.provider, model: opts.llm?.model,
     rounds: opts.maxRounds ?? 2, searches: opts.maxSearches ?? 6, batchSize: opts.batchSize ?? 6, limits: opts.limits });
@@ -58,12 +58,14 @@ export async function runMatching(input: EvidenceBundle, opts: MatchingOptions =
           return next && (next.assessmentStatus === 'assessed' || i.assessmentStatus !== 'assessed') ? next : i;
         });
         for (const item of result.items) tracer?.emit({ type: 'match_assessment', runId: taskId, ts: new Date().toISOString(), requirementId: item.requirement.id, status: item.assessmentStatus, verdict: item.verdict });
+        if (result.failure || result.items.some(i => i.assessmentStatus !== 'assessed')) meta.executionErrors++;
         if (result.failure === 'timeout') { meta.stoppedBecause = 'timeout'; return; }
       } catch (error) {
         const kind = failureKind(error);
         if (kind === 'cancelled' || opts.signal?.aborted) throw error;
         items = items.map(i => requirements.some(r => r.id === i.requirement.id) && i.assessmentStatus !== 'assessed'
           ? { ...i, assessmentStatus: kind === 'timeout' ? 'timeout' : 'failed' } : i);
+        meta.executionErrors++;
         meta.stoppedBecause = kind;
         if (kind === 'timeout') return;
       }
@@ -84,11 +86,13 @@ export async function runMatching(input: EvidenceBundle, opts: MatchingOptions =
     messages.push({ role: 'user', text: JSON.stringify({ ...assessmentInput(bundle, unresolved.map(i => i.requirement)), assessments: unresolved, attemptedQueries: [...queries], remainingSearches: maxSearches - meta.searches }) });
     try {
       const response = await llm.chat({ system: PLAN_SYSTEM, messages, tools: [tool] });
+      if (!['stop', 'tool_calls'].includes(response.finish)) { meta.executionErrors++; meta.stoppedBecause = response.finish; break; }
       if (!response.toolCalls.length) { meta.stoppedBecause = response.finish === 'stop' ? 'no_more_queries' : response.finish; break; }
       messages.push({ role: 'assistant', text: response.text, toolCalls: response.toolCalls, raw: response.raw });
       meta.rounds = round;
       const results: ToolResult[] = [];
       const changed = new Set<string>();
+      let searchFailure: string | undefined;
       for (const call of response.toolCalls) {
         const start = Date.now();
         const args = searchArgs.safeParse(call.args);
@@ -98,6 +102,7 @@ export async function runMatching(input: EvidenceBundle, opts: MatchingOptions =
         let text = 'Blocked: only unique read-only searches for unresolved requirements are allowed.';
         let isError = !allowed;
         let added = 0;
+        if (!allowed) { meta.executionErrors++; searchFailure = 'search_blocked'; }
         if (allowed && args.success) {
           meta.searches++; queries.add(key);
           try {
@@ -108,22 +113,23 @@ export async function runMatching(input: EvidenceBundle, opts: MatchingOptions =
             text = JSON.stringify(assessmentInput(bundle, [unresolved.find(i => i.requirement.id === args.data.requirementId)!.requirement]));
           } catch (error) {
             if (failureKind(error) === 'cancelled' || opts.signal?.aborted) throw error;
-            isError = true; text = `Search failed: ${failureKind(error)}`;
+            meta.executionErrors++; searchFailure = failureKind(error);
+            isError = true; text = `Search failed: ${searchFailure}`;
           }
         }
         tracer?.emit({ type: 'match_search', runId: taskId, taskId, ts: new Date().toISOString(), toolCallId: call.id, requirementId: args.success ? args.data.requirementId : undefined, round, newSources: added, blocked: !allowed, isError, ms: Date.now() - start });
         results.push({ callId: call.id, name: call.name, text, isError });
       }
       messages.push({ role: 'tool', results });
-      if (!changed.size) { meta.stoppedBecause = 'no_new_evidence'; break; }
+      if (!changed.size) { meta.stoppedBecause = searchFailure ?? 'no_new_evidence'; break; }
       await assess([...changed]);
       if (meta.stoppedBecause !== 'timeout') meta.stoppedBecause = items.every(i => i.assessmentStatus === 'assessed') ? 'completed' : 'partial';
     } catch (error) {
       if (failureKind(error) === 'cancelled' || opts.signal?.aborted) throw error;
-      meta.stoppedBecause = failureKind(error); break;
+      meta.executionErrors++; meta.stoppedBecause = failureKind(error); break;
     }
   }
-  if (meta.stoppedBecause !== 'timeout' && items.some(i => i.verdict !== 'supported' && i.verdict !== 'contradicted') && (meta.searches >= maxSearches || meta.rounds >= maxRounds)) meta.stoppedBecause = 'search_limit';
-  if (meta.stoppedBecause === 'timeout' && items.every(i => i.assessmentStatus === 'assessed')) meta.stoppedBecause = 'completed';
+  if (['completed', 'partial'].includes(meta.stoppedBecause) && items.some(i => i.verdict !== 'supported' && i.verdict !== 'contradicted') && (meta.searches >= maxSearches || meta.rounds >= maxRounds)) meta.stoppedBecause = 'search_limit';
+  if (meta.executionErrors && meta.stoppedBecause === 'completed') meta.stoppedBecause = 'partial';
   return finish();
 }

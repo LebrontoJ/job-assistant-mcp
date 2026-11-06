@@ -14,7 +14,8 @@ export class MatchCache {
   }
   set(key: string, result: MatchAssessment): void {
     // Failed, partial-execution and context-limited reports must be retryable.
-    if (!result.items.length || result.items.some(i => i.assessmentStatus !== 'assessed')) return;
+    const successfulStops = new Set(['completed', 'no_more_queries', 'no_new_evidence', 'search_limit']);
+    if (result.meta.executionErrors || !successfulStops.has(result.meta.stoppedBecause) || !result.items.length || result.items.some(i => i.assessmentStatus !== 'assessed')) return;
     this.entries.set(key, structuredClone(result));
     while (this.entries.size > this.maxEntries) this.entries.delete(this.entries.keys().next().value!);
   }

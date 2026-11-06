@@ -23,8 +23,9 @@ describe('matching comparison protocol', () => {
     const result = await evaluateMatchingCase(c, 'assessment', { llm });
     expect(baseline.exact).toBe(true);
     expect(result).toMatchObject({ exact: true, citations: 1, goldAlignedCitations: 1, modelCalls: 1 });
-    const summary = summarizeMatching([result, { ...result, predicted: null, completed: false, exact: false, citations: 0, goldAlignedCitations: 0 }]);
+    const summary = summarizeMatching([result, { ...result, predicted: null, judgmentCompleted: false, completed: false, exact: false, citations: 0, goldAlignedCitations: 0 }]);
     expect(summary.completion).toEqual({ numerator: 1, denominator: 2, rate: 0.5 });
+    expect(summary.judgmentCompletion).toEqual({ numerator: 1, denominator: 2, rate: 0.5 });
     expect(summary.falseRejection).toMatchObject({ numerator: 1, denominator: 2 });
     expect(summary.falseSupport.rate).toBeNull();
   });

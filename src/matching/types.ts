@@ -44,7 +44,7 @@ export interface MatchAssessment {
   version: string; mode: MatchMode; items: AssessedRequirement[]; sources: Source[];
   snapshotHash: string;
   summary: Record<'requirement' | 'nice_to_have', { total: number; assessed: number; supported: number; partial: number; insufficient: number; contradicted: number; unassessed: number }>;
-  meta: { provider?: string; model?: string; cacheHit: boolean; modelCalls: number; inputTokens: number; outputTokens: number; searches: number; rounds: number; ms: number; stoppedBecause: string };
+  meta: { provider?: string; model?: string; cacheHit: boolean; modelCalls: number; inputTokens: number; outputTokens: number; searches: number; rounds: number; executionErrors: number; ms: number; stoppedBecause: string };
 }
 export const digest = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 

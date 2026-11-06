@@ -32,7 +32,8 @@ describe('bounded read-only matching agent', () => {
     ]) : assessment(req) };
     const result = await runMatching(bundle, { mode: 'agent', llm, search: async () => { reads++; return []; } });
     expect(reads).toBe(1);
-    expect(result.meta.stoppedBecause).toBe('no_new_evidence');
+    expect(result.meta.stoppedBecause).toBe('search_blocked');
+    expect(result.meta.executionErrors).toBeGreaterThan(0);
     expect(result.items[0]?.verdict).toBe('insufficient');
   });
   it('leaves retrieval-only results explicitly unassessed without model calls', async () => {

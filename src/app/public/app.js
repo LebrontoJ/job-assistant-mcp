@@ -38,7 +38,7 @@ function showReport(data) {
       const counts = assessment.summary[kind];
       requirementSection.append(el('p', `${title} ${counts.total} 项：直接支持 ${counts.supported} · 部分支持 ${counts.partial} · 信息不足 ${counts.insufficient} · 明确不符 ${counts.contradicted} · 未完成评估 ${counts.unassessed}`));
     }
-    requirementSection.append(el('p', assessment.mode === 'retrieval' ? '当前仅做检索，未完成语义评估。' : `模型证据判断需人工核对。补充检索 ${assessment.meta.searches} 次；${assessment.meta.stoppedBecause === 'completed' ? '评估已完成' : '部分结果或受限结果，请查看各项状态'}。`, 'muted'));
+    requirementSection.append(el('p', assessment.mode === 'retrieval' ? '当前仅做检索，未完成语义评估。' : `模型证据判断需人工核对。补充检索 ${assessment.meta.searches} 次；${assessment.meta.executionErrors ? `执行中有 ${assessment.meta.executionErrors} 次失败或拦截，已保留可用判断；可重试` : assessment.meta.stoppedBecause === 'completed' ? '评估已完成' : '部分结果或受限结果，请查看各项状态'}。`, 'muted'));
   }
   requirementSection.append(el('p', '证据判断与检索信号分别展示。请核对原文；年限尚未独立核算。', 'muted'));
   for (const [index, item] of data.requirements.entries()) {

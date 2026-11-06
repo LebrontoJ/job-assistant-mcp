@@ -22,13 +22,13 @@ export async function loadMatchingCases(split: 'dev' | 'heldout' = 'dev'): Promi
 }
 export interface MatchCaseResult {
   id: string; category: string; mode: MatchMode; expected: z.infer<typeof VerdictSchema>;
-  predicted: z.infer<typeof VerdictSchema> | null; completed: boolean; exact: boolean;
+  predicted: z.infer<typeof VerdictSchema> | null; judgmentCompleted: boolean; completed: boolean; exact: boolean;
   citations: number; goldAlignedCitations: number; modelCalls: number; inputTokens: number; outputTokens: number;
   searches: number; ms: number; error?: string;
 }
 export async function evaluateMatchingCase(c: MatchingCase, mode: MatchMode, opts: MatchingOptions = {}): Promise<MatchCaseResult> {
   const start = Date.now();
-  const base: MatchCaseResult = { id: c.id, category: c.category, mode, expected: c.expectedVerdict, predicted: null, completed: false, exact: false, citations: 0, goldAlignedCitations: 0, modelCalls: 0, inputTokens: 0, outputTokens: 0, searches: 0, ms: 0 };
+  const base: MatchCaseResult = { id: c.id, category: c.category, mode, expected: c.expectedVerdict, predicted: null, judgmentCompleted: false, completed: false, exact: false, citations: 0, goldAlignedCitations: 0, modelCalls: 0, inputTokens: 0, outputTokens: 0, searches: 0, ms: 0 };
   try {
     const index = ProfileIndex.fromMarkdown(c.profile);
     const jd = { ...parseJd('Synthetic evaluation position'), requirements: [c.requirement] };
@@ -37,13 +37,14 @@ export async function evaluateMatchingCase(c: MatchingCase, mode: MatchMode, opt
       const label = initial.items[0]!.support;
       // Baseline projection for label comparison only, never presented as a semantic assessment.
       base.predicted = label === 'supported' ? 'supported' : label === 'weak' ? 'partial' : 'insufficient';
-      base.completed = true;
+      base.judgmentCompleted = true; base.completed = true;
     } else {
       const result = await runMatching(initial.evidenceBundle!, { ...opts, mode,
         search: async (query, k, signal) => { signal.throwIfAborted(); return (await index.search(query, k)).map(h => h.chunk); } });
       const item = result.items[0]!;
-      if (item.assessmentStatus === 'failed' || item.assessmentStatus === 'timeout' || result.meta.stoppedBecause === 'model_unavailable') base.error = `Assessment unavailable: ${item.assessmentStatus}`;
-      base.completed = item.assessmentStatus === 'assessed'; base.predicted = item.verdict;
+      if (item.assessmentStatus === 'failed' || item.assessmentStatus === 'timeout' || result.meta.stoppedBecause === 'model_unavailable' || result.meta.executionErrors) base.error = `Matching incomplete: ${result.meta.stoppedBecause} (${result.meta.executionErrors} execution errors)`;
+      base.judgmentCompleted = item.assessmentStatus === 'assessed';
+      base.completed = base.judgmentCompleted && !base.error; base.predicted = item.verdict;
       Object.assign(base, { modelCalls: result.meta.modelCalls, inputTokens: result.meta.inputTokens, outputTokens: result.meta.outputTokens, searches: result.meta.searches });
       for (const ref of item.criteria.flatMap(c => c.evidence)) {
         base.citations++;
@@ -65,6 +66,7 @@ export function summarizeMatching(rows: MatchCaseResult[]) {
   return {
     total: rows.length, errors: rows.filter(r => r.error).length,
     completion: fraction(rows.filter(r => r.completed).length, rows.length),
+    judgmentCompletion: fraction(rows.filter(r => r.judgmentCompleted).length, rows.length),
     exact: fraction(rows.filter(r => r.exact).length, rows.length),
     falseSupport: fraction(negative.filter(r => r.predicted === 'supported').length, negative.length),
     supportPrecision: fraction(predictedSupport.filter(r => r.expected === 'supported').length, predictedSupport.length),

@@ -1,7 +1,7 @@
 import { failureKind, type FailureKind } from '../agent/execution.js';
 import { z } from 'zod';
 import type { LLMClient } from '../agent/llm/types.js';
-import { isQuantitative } from '../server/match.js';
+import { isDurationRequirement } from './duration.js';
 import { AssessmentOutputSchema, aggregate, type AssessedRequirement, type EvidenceBundle, type Requirement } from './types.js';
 
 export const ASSESS_SYSTEM = `You assess each job requirement against the candidate evidence, not plausibility or keyword similarity.
@@ -40,7 +40,7 @@ export function validateAssessment(value: unknown, bundle: EvidenceBundle, requi
     // A model may not turn an unverified duration into a verified qualification.
     const checked = criteria.map(c => {
       const original = requirement.criteria.find(r => r.id === c.criterionId)!;
-      return c.verdict === 'supported' && isQuantitative(original.text)
+      return c.verdict === 'supported' && isDurationRequirement(original.text)
         ? { ...c, verdict: 'partial' as const, missingInformation: [...c.missingInformation, 'Qualifying duration has not been independently verified.'] }
         : c;
     });

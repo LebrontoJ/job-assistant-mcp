@@ -11,7 +11,9 @@ export function addSources(bundle: EvidenceBundle, requirementId: string, hits: 
   let added = 0;
   for (const hit of hits) {
     if (!hit.text.trim()) continue;
-    const source = SourceSchema.parse({ ...hit, hash: digest(hit) });
+    // MCP search hits also carry ranking scores; source identity excludes retrieval metadata.
+    const fields = { id: hit.id, source: hit.source, heading: hit.heading, text: hit.text };
+    const source = SourceSchema.parse({ ...fields, hash: digest(fields) });
     const existing = bundle.sources.find(s => s.id === source.id);
     if (existing && existing.hash !== source.hash) throw new Error('Source changed during matching');
     const size = source.text.length + source.heading.length + source.source.length;
