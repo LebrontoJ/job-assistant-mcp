@@ -1,3 +1,4 @@
+import type { MatchingOptions } from '../matching/agent.js';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
@@ -18,7 +19,7 @@ const previewInput = z.union([
   z.object({ id: z.string(), status: StatusSchema }).strict(),
 ]);
 const decisionInput = z.object({ operationId: z.string().uuid(), decision: z.enum(['approve', 'cancel']) }).strict();
-interface AppOptions { client: Client; store: ApplicationStore; llm?: LLMClient; tracer?: Tracer }
+interface AppOptions { matching?: MatchingOptions; client: Client; store: ApplicationStore; llm?: LLMClient; tracer?: Tracer }
 interface Preview { operation: PendingOperation; response: Record<string, unknown>; taskId: string; decision?: 'approve' | 'cancel' }
 class HttpError extends Error { constructor(readonly status: number, message: string) { super(message); } }
 async function body(req: IncomingMessage): Promise<unknown> {
@@ -80,7 +81,7 @@ export function createApp(opts: AppOptions) {
         if (activeAnalyses >= 2) throw new HttpError(429, 'Two analyses are already running. Please wait.');
         activeAnalyses++;
         try {
-          const report = await analyseTask(opts.client, input.jd, { taskId, llm: opts.llm, tracer: opts.tracer, signal: controller.signal });
+          const report = await analyseTask(opts.client, input.jd, { taskId, llm: opts.llm, matching: opts.matching, tracer: opts.tracer, signal: controller.signal });
           if (tasks.size >= 100) tasks.delete(tasks.keys().next().value!);
           tasks.set(report.taskId, { report, created: Date.now() });
           send(res, 200, report); return;

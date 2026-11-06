@@ -1,3 +1,4 @@
+import { createMatching } from '../matching/factory.js';
 import { createJdParser } from '../parsing/factory.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
@@ -25,7 +26,7 @@ const mcpServer = createServer(store, profile, { match: { semantic: embedding.ma
 const client = new Client({ name: 'job-assistant-app', version: '0.2.0' });
 const [a, b] = InMemoryTransport.createLinkedPair();
 await traceStage(startupTracer, startupId, 'mcp.connect', () => Promise.all([mcpServer.connect(a), client.connect(b)]));
-const app = createApp({ client, store, llm: mode === 'live' ? createLLM() : undefined, tracer });
+const app = createApp({ client, store, matching: createMatching(process.env, mode === 'extractive'), llm: mode === 'live' ? createLLM() : undefined, tracer });
 const port = Number(process.env.PORT ?? 3210);
 if (!Number.isInteger(port) || port < 0 || port > 65535) throw new Error('Invalid PORT.');
 app.on('error', async error => { console.error(error.message); await client.close(); process.exitCode = 1; });
