@@ -3,7 +3,9 @@ import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import type { ProfileIndex } from "../rag/index.js";
 import { ApplicationStore, StatusSchema } from "../store/applications.js";
-import { parseJd } from "./jd.js";
+import { JdParsingService } from "../parsing/service.js";
+import type { JdParser } from "../parsing/types.js";
+import type { Tracer } from "../agent/trace.js";
 import { matchProfile, type MatchOptions } from "./match.js";
 
 const json = (value: unknown): CallToolResult => ({
@@ -23,7 +25,16 @@ const confirmField = z
   .optional()
   .describe("Must be true to actually write. Set it only after the user has explicitly approved the change.");
 
-export function createServer(store: ApplicationStore, profile?: ProfileIndex, opts: { match?: MatchOptions } = {}): McpServer {
+export function createServer(store: ApplicationStore, profile?: ProfileIndex, opts: { match?: MatchOptions; jdParser?: JdParser; tracer?: Tracer } = {}): McpServer {
+  const parser = opts.jdParser ?? new JdParsingService({ mode: 'rules' });
+  const parse = async (text: string, extra: { signal: AbortSignal; requestId: string | number; _meta?: Record<string, unknown> }) => {
+    const result = await parser.parse(text, extra.signal);
+    opts.tracer?.emit({ type: 'jd_parse', runId: typeof extra._meta?.runId === 'string' ? extra._meta.runId : `mcp-${extra.requestId}`,
+      taskId: typeof extra._meta?.taskId === 'string' ? extra._meta.taskId : undefined,
+      toolCallId: typeof extra._meta?.toolCallId === 'string' ? extra._meta.toolCallId : String(extra.requestId),
+      ts: new Date().toISOString(), ...result.meta });
+    return result;
+  };
   const preview = async (tool: string, args: Record<string, unknown>, extra: Record<string, unknown>) => {
     const { operation, current } = await store.preparePreview(tool, args);
     return json({ status: "pending_confirmation", ...extra, ...(current ? { current } : {}), operation, hint: PENDING_HINT });
@@ -37,10 +48,13 @@ export function createServer(store: ApplicationStore, profile?: ProfileIndex, op
       description:
         "Split a pasted job description into structured fields: title, company, location, work mode, " +
         "minimum years of experience, responsibilities, requirements, nice-to-haves and recognised skills. " +
-        "Deterministic and read-only; it does not judge fit.",
-      inputSchema: { text: z.string().min(20).describe("The full job description text.") },
+        "Read-only extraction using configured Gemini parsing with rule fallback; it does not judge fit.",
+      inputSchema: { text: z.string().trim().min(20).max(50_000).describe("The full job description text.") },
     },
-    async ({ text }) => json(parseJd(text)),
+    async ({ text }, extra) => {
+      const result = await parse(text, extra);
+      return json({ ...result.data, parsing: result.meta });
+    },
   );
 
   server.registerTool(
@@ -172,11 +186,12 @@ export function createServer(store: ApplicationStore, profile?: ProfileIndex, op
         "whether the profile has supporting evidence (with chunk ids), and which JD skills appear or are missing. " +
         "Read-only; the result is a retrieval signal for you to interpret, not a final verdict. 'weak' means a related " +
         "passage exists, not that the requirement is met; requirements with a quantity (years) never exceed 'weak'.",
-      inputSchema: { jd_text: z.string().min(20).describe("The full job description text.") },
+      inputSchema: { jd_text: z.string().trim().min(20).max(50_000).describe("The full job description text.") },
     },
-    async ({ jd_text }) => {
+    async ({ jd_text }, extra) => {
       if (!profile?.size) return noProfile();
-      return json(await matchProfile(parseJd(jd_text), profile, opts.match));
+      const result = await parse(jd_text, extra);
+      return json({ ...await matchProfile(result.data, profile, opts.match), parsing: result.meta });
     },
   );
 

@@ -1,0 +1,930 @@
+{
+  "warm": {
+    "date": "2026-11-06T19:54:42.289Z",
+    "rules": {
+      "cases": 8,
+      "scalarCorrect": 31,
+      "scalarTotal": 40,
+      "scalarAccuracy": 0.775,
+      "lists": {
+        "requirements": {
+          "correct": 7,
+          "predicted": 7,
+          "expected": 12,
+          "precision": 1,
+          "recall": 0.5833333333333334
+        },
+        "niceToHave": {
+          "correct": 2,
+          "predicted": 2,
+          "expected": 5,
+          "precision": 1,
+          "recall": 0.4
+        },
+        "responsibilities": {
+          "correct": 2,
+          "predicted": 2,
+          "expected": 5,
+          "precision": 1,
+          "recall": 0.4
+        },
+        "skills": {
+          "correct": 9,
+          "predicted": 10,
+          "expected": 18,
+          "precision": 0.9,
+          "recall": 0.5
+        }
+      },
+      "fallbackCases": 0,
+      "evidenceRejectedCases": 0,
+      "apiCalls": 0,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "p50Ms": 0,
+      "p95Ms": 1
+    },
+    "gemini": {
+      "cases": 8,
+      "scalarCorrect": 38,
+      "scalarTotal": 40,
+      "scalarAccuracy": 0.95,
+      "lists": {
+        "requirements": {
+          "correct": 11,
+          "predicted": 11,
+          "expected": 12,
+          "precision": 1,
+          "recall": 0.9166666666666666
+        },
+        "niceToHave": {
+          "correct": 4,
+          "predicted": 4,
+          "expected": 5,
+          "precision": 1,
+          "recall": 0.8
+        },
+        "responsibilities": {
+          "correct": 4,
+          "predicted": 4,
+          "expected": 5,
+          "precision": 1,
+          "recall": 0.8
+        },
+        "skills": {
+          "correct": 15,
+          "predicted": 15,
+          "expected": 18,
+          "precision": 1,
+          "recall": 0.8333333333333334
+        }
+      },
+      "fallbackCases": 1,
+      "evidenceRejectedCases": 1,
+      "apiCalls": 7,
+      "inputTokens": 1457,
+      "outputTokens": 840,
+      "p50Ms": 2234,
+      "p95Ms": 6632
+    },
+    "apiSuccessOnly": {
+      "cases": 7,
+      "scalarCorrect": 35,
+      "scalarTotal": 35,
+      "scalarAccuracy": 1,
+      "lists": {
+        "requirements": {
+          "correct": 11,
+          "predicted": 11,
+          "expected": 11,
+          "precision": 1,
+          "recall": 1
+        },
+        "niceToHave": {
+          "correct": 4,
+          "predicted": 4,
+          "expected": 4,
+          "precision": 1,
+          "recall": 1
+        },
+        "responsibilities": {
+          "correct": 4,
+          "predicted": 4,
+          "expected": 4,
+          "precision": 1,
+          "recall": 1
+        },
+        "skills": {
+          "correct": 14,
+          "predicted": 14,
+          "expected": 15,
+          "precision": 1,
+          "recall": 0.9333333333333333
+        }
+      },
+      "fallbackCases": 0,
+      "evidenceRejectedCases": 0,
+      "apiCalls": 6,
+      "inputTokens": 1457,
+      "outputTokens": 840,
+      "p50Ms": 2234,
+      "p95Ms": 6632
+    },
+    "cases": [
+      {
+        "id": "english-headings",
+        "parsing": {
+          "method": "gemini",
+          "model": "gemini-3.1-flash-lite",
+          "version": "jd-v1",
+          "cacheHit": true,
+          "ms": 3,
+          "apiCalls": 0,
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "warnings": []
+        },
+        "score": {
+          "scalarCorrect": 5,
+          "scalarTotal": 5,
+          "lists": {
+            "requirements": {
+              "correct": 2,
+              "predicted": 2,
+              "expected": 2
+            },
+            "niceToHave": {
+              "correct": 1,
+              "predicted": 1,
+              "expected": 1
+            },
+            "responsibilities": {
+              "correct": 1,
+              "predicted": 1,
+              "expected": 1
+            },
+            "skills": {
+              "correct": 2,
+              "predicted": 2,
+              "expected": 2
+            }
+          }
+        }
+      },
+      {
+        "id": "chinese-prose",
+        "parsing": {
+          "method": "gemini",
+          "model": "gemini-3.1-flash-lite",
+          "version": "jd-v1",
+          "cacheHit": false,
+          "ms": 4278,
+          "apiCalls": 1,
+          "inputTokens": 245,
+          "outputTokens": 170,
+          "warnings": []
+        },
+        "score": {
+          "scalarCorrect": 5,
+          "scalarTotal": 5,
+          "lists": {
+            "requirements": {
+              "correct": 2,
+              "predicted": 2,
+              "expected": 2
+            },
+            "niceToHave": {
+              "correct": 1,
+              "predicted": 1,
+              "expected": 1
+            },
+            "responsibilities": {
+              "correct": 1,
+              "predicted": 1,
+              "expected": 1
+            },
+            "skills": {
+              "correct": 3,
+              "predicted": 3,
+              "expected": 3
+            }
+          }
+        }
+      },
+      {
+        "id": "nonstandard-prose",
+        "parsing": {
+          "method": "rules",
+          "model": "gemini-3.1-flash-lite",
+          "version": "jd-v1",
+          "cacheHit": false,
+          "ms": 3744,
+          "apiCalls": 1,
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "fallbackReason": "unsupported_evidence",
+          "warnings": [
+            "Gemini unavailable (unsupported_evidence); using rule-based JD parsing."
+          ]
+        },
+        "score": {
+          "scalarCorrect": 3,
+          "scalarTotal": 5,
+          "lists": {
+            "requirements": {
+              "correct": 0,
+              "predicted": 0,
+              "expected": 1
+            },
+            "niceToHave": {
+              "correct": 0,
+              "predicted": 0,
+              "expected": 1
+            },
+            "responsibilities": {
+              "correct": 0,
+              "predicted": 0,
+              "expected": 1
+            },
+            "skills": {
+              "correct": 1,
+              "predicted": 1,
+              "expected": 3
+            }
+          }
+        }
+      },
+      {
+        "id": "different-years",
+        "parsing": {
+          "method": "gemini",
+          "model": "gemini-3.1-flash-lite",
+          "version": "jd-v1",
+          "cacheHit": false,
+          "ms": 2234,
+          "apiCalls": 1,
+          "inputTokens": 247,
+          "outputTokens": 155,
+          "warnings": []
+        },
+        "score": {
+          "scalarCorrect": 5,
+          "scalarTotal": 5,
+          "lists": {
+            "requirements": {
+              "correct": 2,
+              "predicted": 2,
+              "expected": 2
+            },
+            "niceToHave": {
+              "correct": 1,
+              "predicted": 1,
+              "expected": 1
+            },
+            "responsibilities": {
+              "correct": 0,
+              "predicted": 0,
+              "expected": 0
+            },
+            "skills": {
+              "correct": 2,
+              "predicted": 2,
+              "expected": 2
+            }
+          }
+        }
+      },
+      {
+        "id": "no-requirements",
+        "parsing": {
+          "method": "gemini",
+          "model": "gemini-3.1-flash-lite",
+          "version": "jd-v1",
+          "cacheHit": false,
+          "ms": 1945,
+          "apiCalls": 1,
+          "inputTokens": 233,
+          "outputTokens": 95,
+          "warnings": []
+        },
+        "score": {
+          "scalarCorrect": 5,
+          "scalarTotal": 5,
+          "lists": {
+            "requirements": {
+              "correct": 0,
+              "predicted": 0,
+              "expected": 0
+            },
+            "niceToHave": {
+              "correct": 0,
+              "predicted": 0,
+              "expected": 0
+            },
+            "responsibilities": {
+              "correct": 0,
+              "predicted": 0,
+              "expected": 0
+            },
+            "skills": {
+              "correct": 0,
+              "predicted": 0,
+              "expected": 0
+            }
+          }
+        }
+      },
+      {
+        "id": "symbols-and-new-skills",
+        "parsing": {
+          "method": "gemini",
+          "model": "gemini-3.1-flash-lite",
+          "version": "jd-v1",
+          "cacheHit": false,
+          "ms": 6632,
+          "apiCalls": 1,
+          "inputTokens": 233,
+          "outputTokens": 148,
+          "warnings": []
+        },
+        "score": {
+          "scalarCorrect": 5,
+          "scalarTotal": 5,
+          "lists": {
+            "requirements": {
+              "correct": 2,
+              "predicted": 2,
+              "expected": 2
+            },
+            "niceToHave": {
+              "correct": 0,
+              "predicted": 0,
+              "expected": 0
+            },
+            "responsibilities": {
+              "correct": 1,
+              "predicted": 1,
+              "expected": 1
+            },
+            "skills": {
+              "correct": 3,
+              "predicted": 3,
+              "expected": 3
+            }
+          }
+        }
+      },
+      {
+        "id": "injection",
+        "parsing": {
+          "method": "gemini",
+          "model": "gemini-3.1-flash-lite",
+          "version": "jd-v1",
+          "cacheHit": false,
+          "ms": 2224,
+          "apiCalls": 1,
+          "inputTokens": 245,
+          "outputTokens": 107,
+          "warnings": []
+        },
+        "score": {
+          "scalarCorrect": 5,
+          "scalarTotal": 5,
+          "lists": {
+            "requirements": {
+              "correct": 1,
+              "predicted": 1,
+              "expected": 1
+            },
+            "niceToHave": {
+              "correct": 0,
+              "predicted": 0,
+              "expected": 0
+            },
+            "responsibilities": {
+              "correct": 0,
+              "predicted": 0,
+              "expected": 0
+            },
+            "skills": {
+              "correct": 0,
+              "predicted": 0,
+              "expected": 1
+            }
+          }
+        }
+      },
+      {
+        "id": "chinese-sections",
+        "parsing": {
+          "method": "gemini",
+          "model": "gemini-3.1-flash-lite",
+          "version": "jd-v1",
+          "cacheHit": false,
+          "ms": 3178,
+          "apiCalls": 1,
+          "inputTokens": 254,
+          "outputTokens": 165,
+          "warnings": []
+        },
+        "score": {
+          "scalarCorrect": 5,
+          "scalarTotal": 5,
+          "lists": {
+            "requirements": {
+              "correct": 2,
+              "predicted": 2,
+              "expected": 2
+            },
+            "niceToHave": {
+              "correct": 1,
+              "predicted": 1,
+              "expected": 1
+            },
+            "responsibilities": {
+              "correct": 1,
+              "predicted": 1,
+              "expected": 1
+            },
+            "skills": {
+              "correct": 4,
+              "predicted": 4,
+              "expected": 4
+            }
+          }
+        }
+      }
+    ]
+  },
+  "cold": {
+    "date": "2026-11-06T19:56:21.417Z",
+    "rules": {
+      "cases": 8,
+      "scalarCorrect": 31,
+      "scalarTotal": 40,
+      "scalarAccuracy": 0.775,
+      "lists": {
+        "requirements": {
+          "correct": 7,
+          "predicted": 7,
+          "expected": 12,
+          "precision": 1,
+          "recall": 0.5833333333333334
+        },
+        "niceToHave": {
+          "correct": 2,
+          "predicted": 2,
+          "expected": 5,
+          "precision": 1,
+          "recall": 0.4
+        },
+        "responsibilities": {
+          "correct": 2,
+          "predicted": 2,
+          "expected": 5,
+          "precision": 1,
+          "recall": 0.4
+        },
+        "skills": {
+          "correct": 9,
+          "predicted": 10,
+          "expected": 18,
+          "precision": 0.9,
+          "recall": 0.5
+        }
+      },
+      "fallbackCases": 0,
+      "evidenceRejectedCases": 0,
+      "apiCalls": 0,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "p50Ms": 0,
+      "p95Ms": 1
+    },
+    "gemini": {
+      "cases": 8,
+      "scalarCorrect": 33,
+      "scalarTotal": 40,
+      "scalarAccuracy": 0.825,
+      "lists": {
+        "requirements": {
+          "correct": 9,
+          "predicted": 9,
+          "expected": 12,
+          "precision": 1,
+          "recall": 0.75
+        },
+        "niceToHave": {
+          "correct": 3,
+          "predicted": 3,
+          "expected": 5,
+          "precision": 1,
+          "recall": 0.6
+        },
+        "responsibilities": {
+          "correct": 3,
+          "predicted": 3,
+          "expected": 5,
+          "precision": 1,
+          "recall": 0.6
+        },
+        "skills": {
+          "correct": 14,
+          "predicted": 15,
+          "expected": 18,
+          "precision": 0.9333333333333333,
+          "recall": 0.7777777777777778
+        }
+      },
+      "fallbackCases": 4,
+      "evidenceRejectedCases": 1,
+      "apiCalls": 8,
+      "inputTokens": 1229,
+      "outputTokens": 704,
+      "p50Ms": 5927,
+      "p95Ms": 10006
+    },
+    "apiSuccessOnly": {
+      "cases": 4,
+      "scalarCorrect": 20,
+      "scalarTotal": 20,
+      "scalarAccuracy": 1,
+      "lists": {
+        "requirements": {
+          "correct": 8,
+          "predicted": 8,
+          "expected": 8,
+          "precision": 1,
+          "recall": 1
+        },
+        "niceToHave": {
+          "correct": 3,
+          "predicted": 3,
+          "expected": 3,
+          "precision": 1,
+          "recall": 1
+        },
+        "responsibilities": {
+          "correct": 3,
+          "predicted": 3,
+          "expected": 3,
+          "precision": 1,
+          "recall": 1
+        },
+        "skills": {
+          "correct": 11,
+          "predicted": 11,
+          "expected": 11,
+          "precision": 1,
+          "recall": 1
+        }
+      },
+      "fallbackCases": 0,
+      "evidenceRejectedCases": 0,
+      "apiCalls": 4,
+      "inputTokens": 986,
+      "outputTokens": 541,
+      "p50Ms": 2675,
+      "p95Ms": 6134
+    },
+    "cases": [
+      {
+        "id": "english-headings",
+        "parsing": {
+          "method": "gemini",
+          "model": "gemini-3.1-flash-lite",
+          "version": "jd-v1",
+          "cacheHit": false,
+          "ms": 2675,
+          "apiCalls": 1,
+          "inputTokens": 252,
+          "outputTokens": 158,
+          "warnings": []
+        },
+        "score": {
+          "scalarCorrect": 5,
+          "scalarTotal": 5,
+          "lists": {
+            "requirements": {
+              "correct": 2,
+              "predicted": 2,
+              "expected": 2
+            },
+            "niceToHave": {
+              "correct": 1,
+              "predicted": 1,
+              "expected": 1
+            },
+            "responsibilities": {
+              "correct": 1,
+              "predicted": 1,
+              "expected": 1
+            },
+            "skills": {
+              "correct": 2,
+              "predicted": 2,
+              "expected": 2
+            }
+          }
+        }
+      },
+      {
+        "id": "chinese-prose",
+        "parsing": {
+          "method": "rules",
+          "model": "gemini-3.1-flash-lite",
+          "version": "jd-v1",
+          "cacheHit": false,
+          "ms": 10006,
+          "apiCalls": 1,
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "fallbackReason": "timeout",
+          "warnings": [
+            "Gemini unavailable (timeout); using rule-based JD parsing."
+          ]
+        },
+        "score": {
+          "scalarCorrect": 1,
+          "scalarTotal": 5,
+          "lists": {
+            "requirements": {
+              "correct": 0,
+              "predicted": 0,
+              "expected": 2
+            },
+            "niceToHave": {
+              "correct": 0,
+              "predicted": 0,
+              "expected": 1
+            },
+            "responsibilities": {
+              "correct": 0,
+              "predicted": 0,
+              "expected": 1
+            },
+            "skills": {
+              "correct": 1,
+              "predicted": 1,
+              "expected": 3
+            }
+          }
+        }
+      },
+      {
+        "id": "nonstandard-prose",
+        "parsing": {
+          "method": "rules",
+          "model": "gemini-3.1-flash-lite",
+          "version": "jd-v1",
+          "cacheHit": false,
+          "ms": 5331,
+          "apiCalls": 1,
+          "inputTokens": 243,
+          "outputTokens": 163,
+          "fallbackReason": "unsupported_evidence",
+          "warnings": [
+            "Gemini unavailable (unsupported_evidence); using rule-based JD parsing."
+          ]
+        },
+        "score": {
+          "scalarCorrect": 3,
+          "scalarTotal": 5,
+          "lists": {
+            "requirements": {
+              "correct": 0,
+              "predicted": 0,
+              "expected": 1
+            },
+            "niceToHave": {
+              "correct": 0,
+              "predicted": 0,
+              "expected": 1
+            },
+            "responsibilities": {
+              "correct": 0,
+              "predicted": 0,
+              "expected": 1
+            },
+            "skills": {
+              "correct": 1,
+              "predicted": 1,
+              "expected": 3
+            }
+          }
+        }
+      },
+      {
+        "id": "different-years",
+        "parsing": {
+          "method": "gemini",
+          "model": "gemini-3.1-flash-lite",
+          "version": "jd-v1",
+          "cacheHit": false,
+          "ms": 6134,
+          "apiCalls": 1,
+          "inputTokens": 247,
+          "outputTokens": 155,
+          "warnings": []
+        },
+        "score": {
+          "scalarCorrect": 5,
+          "scalarTotal": 5,
+          "lists": {
+            "requirements": {
+              "correct": 2,
+              "predicted": 2,
+              "expected": 2
+            },
+            "niceToHave": {
+              "correct": 1,
+              "predicted": 1,
+              "expected": 1
+            },
+            "responsibilities": {
+              "correct": 0,
+              "predicted": 0,
+              "expected": 0
+            },
+            "skills": {
+              "correct": 2,
+              "predicted": 2,
+              "expected": 2
+            }
+          }
+        }
+      },
+      {
+        "id": "no-requirements",
+        "parsing": {
+          "method": "rules",
+          "model": "gemini-3.1-flash-lite",
+          "version": "jd-v1",
+          "cacheHit": false,
+          "ms": 10003,
+          "apiCalls": 1,
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "fallbackReason": "timeout",
+          "warnings": [
+            "Gemini unavailable (timeout); using rule-based JD parsing."
+          ]
+        },
+        "score": {
+          "scalarCorrect": 4,
+          "scalarTotal": 5,
+          "lists": {
+            "requirements": {
+              "correct": 0,
+              "predicted": 0,
+              "expected": 0
+            },
+            "niceToHave": {
+              "correct": 0,
+              "predicted": 0,
+              "expected": 0
+            },
+            "responsibilities": {
+              "correct": 0,
+              "predicted": 0,
+              "expected": 0
+            },
+            "skills": {
+              "correct": 0,
+              "predicted": 0,
+              "expected": 0
+            }
+          }
+        }
+      },
+      {
+        "id": "symbols-and-new-skills",
+        "parsing": {
+          "method": "gemini",
+          "model": "gemini-3.1-flash-lite",
+          "version": "jd-v1",
+          "cacheHit": false,
+          "ms": 2010,
+          "apiCalls": 1,
+          "inputTokens": 233,
+          "outputTokens": 95,
+          "warnings": []
+        },
+        "score": {
+          "scalarCorrect": 5,
+          "scalarTotal": 5,
+          "lists": {
+            "requirements": {
+              "correct": 2,
+              "predicted": 2,
+              "expected": 2
+            },
+            "niceToHave": {
+              "correct": 0,
+              "predicted": 0,
+              "expected": 0
+            },
+            "responsibilities": {
+              "correct": 1,
+              "predicted": 1,
+              "expected": 1
+            },
+            "skills": {
+              "correct": 3,
+              "predicted": 3,
+              "expected": 3
+            }
+          }
+        }
+      },
+      {
+        "id": "injection",
+        "parsing": {
+          "method": "rules",
+          "model": "gemini-3.1-flash-lite",
+          "version": "jd-v1",
+          "cacheHit": false,
+          "ms": 10002,
+          "apiCalls": 1,
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "fallbackReason": "timeout",
+          "warnings": [
+            "Gemini unavailable (timeout); using rule-based JD parsing."
+          ]
+        },
+        "score": {
+          "scalarCorrect": 5,
+          "scalarTotal": 5,
+          "lists": {
+            "requirements": {
+              "correct": 1,
+              "predicted": 1,
+              "expected": 1
+            },
+            "niceToHave": {
+              "correct": 0,
+              "predicted": 0,
+              "expected": 0
+            },
+            "responsibilities": {
+              "correct": 0,
+              "predicted": 0,
+              "expected": 0
+            },
+            "skills": {
+              "correct": 1,
+              "predicted": 2,
+              "expected": 1
+            }
+          }
+        }
+      },
+      {
+        "id": "chinese-sections",
+        "parsing": {
+          "method": "gemini",
+          "model": "gemini-3.1-flash-lite",
+          "version": "jd-v1",
+          "cacheHit": false,
+          "ms": 5927,
+          "apiCalls": 1,
+          "inputTokens": 254,
+          "outputTokens": 133,
+          "warnings": []
+        },
+        "score": {
+          "scalarCorrect": 5,
+          "scalarTotal": 5,
+          "lists": {
+            "requirements": {
+              "correct": 2,
+              "predicted": 2,
+              "expected": 2
+            },
+            "niceToHave": {
+              "correct": 1,
+              "predicted": 1,
+              "expected": 1
+            },
+            "responsibilities": {
+              "correct": 1,
+              "predicted": 1,
+              "expected": 1
+            },
+            "skills": {
+              "correct": 4,
+              "predicted": 4,
+              "expected": 4
+            }
+          }
+        }
+      }
+    ]
+  },
+  "notes": [
+    "Eight synthetic development cases; normalized exact extracts, not a semantic judge or held-out benchmark.",
+    "Warm run included one disk cache hit. Its failed-response usage preceded the token-accounting fix and is incomplete.",
+    "Cold run disabled disk cache. Timed-out provider requests had no returned usage; token totals count known usage only."
+  ]
+}

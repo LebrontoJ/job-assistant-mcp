@@ -1,4 +1,4 @@
-// Deterministic JD structuring. The server stays model-free on purpose: it splits the
+// Deterministic JD structuring for offline use and Gemini fallback. This parser splits
 // text into sections and pulls out checkable facts; judging fit is the agent's job.
 
 export interface ParsedJd {

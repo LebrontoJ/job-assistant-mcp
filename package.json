@@ -22,7 +22,8 @@
     "eval:freeze": "node --import tsx scripts/freeze-baseline.ts",
     "store:migrate": "node --import tsx scripts/migrate-store.ts",
     "app": "node --import tsx src/app/index.ts",
-    "eval:claims": "node --import tsx scripts/check-claims.ts"
+    "eval:claims": "node --import tsx scripts/check-claims.ts",
+    "eval:jd": "node --import tsx evals/jd-parsing.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.135.0",

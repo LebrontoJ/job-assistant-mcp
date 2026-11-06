@@ -1,3 +1,4 @@
+import { createJdParser } from '../parsing/factory.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { resolve } from 'node:path';
@@ -20,7 +21,7 @@ const startupTracer = contextualTracer(tracer, startupId);
 const embedding = mode === 'live' ? createEmbedding() : {};
 const profile = await traceStage(startupTracer, startupId, 'profile.index', () => new ExecutionBudget(60_000).run('profile.index', 60_000, () => ProfileIndex.fromDir(resolve(process.env.PROFILE_DIR ?? 'data/sample/profile'), tracedEmbedder(embedding.embedder, startupTracer, startupId), { minSimilarity: embedding.minSimilarity })));
 const store = new ApplicationStore(resolve(process.env.APPLICATIONS_FILE ?? 'data/sample/applications.json'));
-const mcpServer = createServer(store, profile, { match: { semantic: embedding.matchSemantic } });
+const mcpServer = createServer(store, profile, { match: { semantic: embedding.matchSemantic }, jdParser: createJdParser(process.env, { offline: mode === 'extractive' }), tracer });
 const client = new Client({ name: 'job-assistant-app', version: '0.2.0' });
 const [a, b] = InMemoryTransport.createLinkedPair();
 await traceStage(startupTracer, startupId, 'mcp.connect', () => Promise.all([mcpServer.connect(a), client.connect(b)]));

@@ -23,6 +23,11 @@ function showReport(data) {
   report = data;
   $('empty').hidden = true; $('report').hidden = false; $('report').replaceChildren();
   $('report-status').textContent = `${data.requirements.length} 条岗位要求`;
+  if (data.parsing) {
+    const reasons = { missing_key: '未配置 API key', timeout: 'API 超时', rate_limited: 'API 限流', provider_error: 'API 不可用', blocked: 'API 拒答', truncated: '输出截断', invalid_output: '输出格式无效', unsupported_evidence: '原文依据校验失败' };
+    const status = data.parsing.method === 'gemini' ? 'Gemini 解析' : data.parsing.fallbackReason ? `${reasons[data.parsing.fallbackReason] ?? 'API 不可用'}，已使用规则解析` : '规则解析';
+    $('report').append(el('p', `JD · ${status}${data.parsing.cacheHit ? ' · 已复用解析结果' : ''}`, 'muted'));
+  }
   $('step2').classList.add('active');
   const requirementSection = section('01 / 岗位要求与检索依据');
   requirementSection.append(el('p', '以下为检索信号。相关片段不等于满足要求，请核查原文；年限尚未自动计算。', 'muted'));

@@ -83,7 +83,7 @@ export async function runAgent(
   llm = boundedLLM(llm, budget);
   const runId = opts.runId ?? Math.random().toString(36).slice(2, 10);
   const tracer = contextualTracer(opts.tracer, opts.taskId ?? runId);
-  const executor = new ToolExecutor(mcp, { ...tracedExecution(opts.execution, tracer, runId), budget });
+  const executor = new ToolExecutor(mcp, { ...tracedExecution(opts.execution, tracer, runId, opts.taskId ?? runId), budget });
   const startedAt = Date.now();
   const now = () => new Date().toISOString();
   let tools: ToolSpec[];

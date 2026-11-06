@@ -1,3 +1,4 @@
+import type { ParseMeta } from '../parsing/types.js';
 import { appendFileSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { failureKind, type ExecutionOptions } from "./execution.js";
@@ -48,6 +49,7 @@ export type TraceEvent = TraceContext & (
       outputTokens: number;
       answerChars: number;
     }
+  | ({ type: "jd_parse"; runId: string; ts: string } & ParseMeta)
   | { type: "stage"; runId: string; ts: string; name: string; ms: number; status: "ok" | "error" }
   | { type: "tool_attempt"; runId: string; ts: string; toolCallId: string; name: string; attempt: number; ms: number; retrying: boolean }
 );
@@ -123,6 +125,9 @@ export function formatTrace(events: TraceEvent[]): string {
       case "tool_attempt":
         out.push(`${at(e)}  ATTEMPT ${e.name} #${e.attempt} ${ms(e.ms)} [${e.toolCallId}]${e.operationId ? ` op=${e.operationId}` : ""}${e.errorKind ? ` ${e.errorKind}` : ""}${e.retrying ? " RETRY" : ""}`);
         break;
+      case "jd_parse":
+        out.push(`${at(e)}  JD     ${e.method}${e.model ? `/${e.model}` : ''} ${ms(e.ms)}${e.cacheHit ? ' CACHE' : ''} ${e.apiCalls} API call(s) ${e.inputTokens} in / ${e.outputTokens} out${e.fallbackReason ? ` fallback=${e.fallbackReason}` : ''}`);
+        break;
       case "stage":
         out.push(`${at(e)}  STAGE  ${e.name} ${e.status} ${ms(e.ms)}${e.errorKind ? ` ${e.errorKind}` : ""}`);
         break;
@@ -137,6 +142,7 @@ export function formatTrace(events: TraceEvent[]): string {
 export interface TraceStats {
   runs: number;
   llm: { calls: number; timed: number; retried: number; retries: number; p50?: number; p95?: number; max?: number; inputTokens: number; outputTokens: number };
+  parsing: { calls: number; apiCalls: number; cacheHits: number; fallbacks: number; inputTokens: number; outputTokens: number };
   tools: Array<{ name: string; calls: number; errors: number; blocked: number; avgMs: number; maxMs: number }>;
   runMs: { p50?: number; p95?: number };
   guards: { writeBlocked: number; citationRetry: number };
@@ -179,6 +185,10 @@ export function summarizeEvents(events: TraceEvent[]): TraceStats {
       inputTokens: llmCalls.reduce((a, e) => a + e.inputTokens, 0),
       outputTokens: llmCalls.reduce((a, e) => a + e.outputTokens, 0),
     },
+    parsing: events.reduce((s, e) => e.type === 'jd_parse' ? {
+      calls: s.calls + 1, apiCalls: s.apiCalls + e.apiCalls, cacheHits: s.cacheHits + Number(e.cacheHit),
+      fallbacks: s.fallbacks + Number(!!e.fallbackReason), inputTokens: s.inputTokens + e.inputTokens, outputTokens: s.outputTokens + e.outputTokens,
+    } : s, { calls: 0, apiCalls: 0, cacheHits: 0, fallbacks: 0, inputTokens: 0, outputTokens: 0 }),
     tools: [...byTool.entries()]
       .map(([name, t]) => ({ name, calls: t.calls, errors: t.errors, blocked: t.blocked, avgMs: t.total / t.calls, maxMs: t.max }))
       .sort((a, b) => b.calls - a.calls),
@@ -202,6 +212,7 @@ export function formatStats(s: TraceStats): string[] {
     `| agent run (wall time) | ${ms(s.runMs.p50)} | ${ms(s.runMs.p95)} | |`,
     "",
   ];
+  if (s.parsing.calls) out.push(`JD parsing: ${s.parsing.calls} tool uses, ${s.parsing.apiCalls} API calls, ${s.parsing.cacheHits} reused results, ${s.parsing.fallbacks} fallback uses; ${s.parsing.inputTokens} in / ${s.parsing.outputTokens} out (separate from agent tokens).`, '');
   if (s.tools.length) {
     out.push("| tool | calls | errors | blocked | avg | max |", "|---|---|---|---|---|---|");
     for (const t of s.tools) out.push(`| ${t.name} | ${t.calls} | ${t.errors} | ${t.blocked} | ${ms(t.avgMs)} | ${ms(t.maxMs)} |`);
@@ -231,8 +242,8 @@ export async function traceStage<T>(tracer: Tracer | undefined, runId: string, n
     throw err;
   }
 }
-export function tracedExecution(opts: ExecutionOptions | undefined, tracer: Tracer | undefined, runId: string): ExecutionOptions {
-  return { ...opts, onAttempt: event => {
+export function tracedExecution(opts: ExecutionOptions | undefined, tracer: Tracer | undefined, runId: string, taskId = runId): ExecutionOptions {
+  return { ...opts, metadata: { taskId, runId }, onAttempt: event => {
     tracer?.emit({ type: 'tool_attempt', runId, ts: new Date().toISOString(), ...event });
     opts?.onAttempt?.(event);
   } };

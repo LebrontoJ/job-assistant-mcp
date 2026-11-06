@@ -54,7 +54,7 @@ describe("decideSupport", () => {
   });
 
   it("detects quantities", () => {
-    for (const t of ["5+ years of backend experience", "at least 3 languages", "2 yrs Python", "10+ engineers"]) expect(isQuantitative(t), t).toBe(true);
+    for (const t of ["5+ years of backend experience", "at least 3 languages", "2 yrs Python", "10+ engineers", "需要3年以上工作经验", "至少三年后端经验", "6个月项目经验", "3至5年工作经验"]) expect(isQuantitative(t), t).toBe(true);
     for (const t of ["Strong knowledge of PostgreSQL", "Experience with Python 3", "Led an incident"]) expect(isQuantitative(t), t).toBe(false);
   });
 });
