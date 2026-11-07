@@ -23,6 +23,7 @@ export async function gradeWorkflow(o:Observation,task:E2ECase,profile:E2EProfil
   const add=(dimension:Check['dimension'],name:string,pass:boolean,detail:string,numerator?:number,denominator?:number,required=true)=>checks.push({dimension,name,state:pass?'pass':'fail',detail,required,numerator,denominator});
   add('parsing','scalar_fields',normalize(r.jd.title??'')===normalize(gold.title)&&normalize(r.jd.company??'')===normalize(gold.company),'Title and company compared to source-labelled fields');
   const extracted=[...r.jd.requirements.map(text=>({text,kind:'requirement'})),...r.jd.niceToHave.map(text=>({text,kind:'nice_to_have'}))];
+  add('parsing','unique_requirements',new Set(extracted.map(p=>p.kind+':'+normalize(p.text))).size===extracted.length,'Duplicate extracted requirements cannot inflate coverage');
   const found=gold.requirements.filter(g=>extracted.some(p=>p.kind===g.kind&&normalize(p.text)===normalize(g.text))).length;
   add('parsing','requirement_coverage',found/gold.requirements.length>=gold.minimumRequirementRecall,`${found}/${gold.requirements.length} source-labelled requirements`,found,gold.requirements.length);
   const precise=extracted.filter(p=>gold.requirements.some(g=>p.kind===g.kind&&normalize(p.text)===normalize(g.text))).length;

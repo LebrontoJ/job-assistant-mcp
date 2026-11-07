@@ -2,7 +2,7 @@ import { runFault } from './faults.js';
 import { gradeWorkflow, type SemanticJudge } from './grading.js';
 import type { TaskReport } from '../../src/agent/task.js';
 import { createEnvironment, type E2EEnvironment, type EnvironmentOptions } from './environment.js';
-import { canonical } from './load.js';
+import { canonical,hash } from './load.js';
 import type { E2ECase,E2EProfile,E2EResult,Check,Stage } from './types.js';
 export interface Observation {
   report?: TaskReport; initial: ReturnType<E2EEnvironment['inspect']>; analysed?: ReturnType<E2EEnvironment['inspect']>;
@@ -78,6 +78,6 @@ export async function runCase(task:E2ECase,profile:E2EProfile,opts:RunOptions):P
   const events=environment?.tracer.events??[];
   const usage={modelCalls:0,inputTokens:0,outputTokens:0,parserCalls:0,parserInputTokens:0,parserOutputTokens:0};
   for(const e of events)if(e.type==='llm_call'){usage.modelCalls++;usage.inputTokens+=e.inputTokens;usage.outputTokens+=e.outputTokens;}else if(e.type==='jd_parse'){usage.parserCalls+=e.apiCalls;usage.parserInputTokens+=e.inputTokens;usage.parserOutputTokens+=e.outputTokens;}
-  return {caseId:task.id,profileId:task.profileId,jdFamily:task.jdFamily,split:task.split,sample:opts.sample??0,runtime:opts.runtime,matchMode:opts.runtime==='offline'?'retrieval':opts.matchMode,track:opts.fault&&opts.fault!=='none'?'reliability':'workflow',fault:opts.fault??'none',officialEligible:opts.officialEligible??false,outcome:decideOutcome(checks,errors),completed:!!observation?.final&&!errors.length,checks,stages,errors,ms:Date.now()-started,usage,
-    ...(opts.artifacts===false?{}:{artifacts:{configuration:environment?.configuration,report:observation?.report,checks,trace:events.map(e=>{const {user,args,result,detail,...safe}=e as any;return safe;})}})};
+  return {caseId:task.id,profileId:task.profileId,jdFamily:task.jdFamily,split:task.split,sample:opts.sample??0,runtime:opts.runtime,matchMode:opts.runtime==='offline'?'retrieval':opts.matchMode,experiment:opts.parserReplay?'matching_ablation':'full_workflow',track:opts.fault&&opts.fault!=='none'?'reliability':'workflow',fault:opts.fault??'none',officialEligible:opts.officialEligible??false,outcome:decideOutcome(checks,errors),completed:!!observation?.final&&!errors.length,checks,stages,errors,ms:Date.now()-started,usage,
+    ...(opts.artifacts===false?{}:{artifacts:{inputJdHash:hash(task.jd),configuration:environment?.configuration,report:observation?.report,checks,trace:events.map(e=>{const {user,args,result,detail,...safe}=e as any;return safe;})}})};
 }

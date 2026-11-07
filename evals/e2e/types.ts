@@ -35,6 +35,7 @@ export interface Check { dimension: 'parsing' | 'retrieval' | 'matching' | 'grou
 export interface Stage { name: string; ms: number; status: 'ok' | 'error' }
 export interface E2EResult {
   caseId: string; profileId: string; jdFamily: string; split: Split; sample: number; runtime: Runtime; matchMode: z.infer<typeof MatchModeSchema>;
+  experiment:'full_workflow'|'matching_ablation';
   track: 'workflow' | 'reliability'; fault: Fault; officialEligible: boolean;
   outcome: 'passed' | 'failed' | 'ungraded' | 'run_error'; completed: boolean; checks: Check[]; stages: Stage[];
   errors: Array<{ stage: string; kind: string }>; ms: number;

@@ -25,7 +25,9 @@
     "eval:claims": "node --import tsx scripts/check-claims.ts",
     "eval:jd": "node --import tsx evals/jd-parsing.ts",
     "eval:matching": "node --import tsx scripts/eval-matching.ts",
-    "eval:e2e": "node --import tsx scripts/eval-e2e.ts"
+    "eval:e2e": "node --import tsx scripts/eval-e2e.ts",
+    "eval:e2e:review": "node --import tsx scripts/review-e2e.ts",
+    "eval:e2e:replay": "node --import tsx scripts/export-e2e-replay.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.135.0",

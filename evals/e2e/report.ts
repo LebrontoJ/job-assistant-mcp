@@ -1,3 +1,4 @@
+import { pairedComparisons } from './comparison.js';
 import { execFileSync } from 'node:child_process';
 import { readdir,readFile } from 'node:fs/promises';
 import { hash } from './load.js';
@@ -30,8 +31,9 @@ export async function sourceManifest() {
   return {revision,dirty,node:process.version,files:Object.fromEntries(await Promise.all(files.sort().map(async file=>[file,hash(await readFile(file))])))};
 }
 export function buildReport(results:E2EResult[],manifest:unknown) {
-  const groups=[...new Set(results.map(r=>`${r.runtime}/${r.matchMode}/${r.track}`))];
+  const groups=[...new Set(results.map(r=>`${r.runtime}/${r.matchMode}/${r.track}/${r.experiment}`))];
   return {version:'e2e-v1',date:new Date().toISOString(),manifest,
     scope:'Synthetic candidate data. Unreviewed labels are provisional. Scripted/reliability results measure host behavior, never live model quality. Known tokens exclude unavailable failed-call usage.',
-    byGroup:Object.fromEntries(groups.map(key=>[key,summarize(results.filter(r=>`${r.runtime}/${r.matchMode}/${r.track}`===key))])),results};
+    comparisons:pairedComparisons(results),
+    byGroup:Object.fromEntries(groups.map(key=>[key,summarize(results.filter(r=>`${r.runtime}/${r.matchMode}/${r.track}/${r.experiment}`===key))])),results};
 }
