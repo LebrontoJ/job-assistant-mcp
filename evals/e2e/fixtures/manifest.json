@@ -1,0 +1,15 @@
+{
+  "version": "e2e-v1",
+  "labelStatus": "author-labelled; pending independent human review",
+  "files": {
+    "cases/dev.jsonl": "e712fc7f627e392381e1ea2a7f1f7d0ee79eb28418b2847a7811653e035ffce6",
+    "cases/heldout.jsonl": "992a769a91fe245d23265a0c1ed618e244a5e4ce28a60aa48872636ffccaf2ed",
+    "cases/validation.jsonl": "9d7e5833eb65070380f6b51ba614d3aeceb28377f7f8ee5a1b08d95b0a529f6b",
+    "profiles/backend.json": "aec84277b113a0c0c10f16a62167d255982ff4a0f00219a925819e238eaf793e",
+    "profiles/data.json": "266a66bc2d9e4bd9f787b23fc7c5a0f117c775e8d8222e01d13f6241e400b497",
+    "profiles/frontend.json": "5f95b9d2b13c500b4523c4f2b9e1cd5d0667aed68c6280920fea894bc25b4ae1",
+    "profiles/fullstack.json": "5aeebb9774e49c3f5717bbc9346fa7db5179eeae7351629aa4d865795a1b86c2",
+    "profiles/platform.json": "84cf5f9d2c7aed413fb9ad83e16e7e9695466ed4f91a72ef77601a7844740746",
+    "profiles/qa.json": "7fd39c9f4f5c59a38075ec9a13d70b7eca6bd17c5d175dc71e48abc74cd4102d"
+  }
+}

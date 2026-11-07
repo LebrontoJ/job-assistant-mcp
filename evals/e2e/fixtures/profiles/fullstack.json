@@ -1,0 +1,9 @@
+{
+  "id": "fullstack",
+  "split": "heldout",
+  "family": "fullstack-experience-family",
+  "documents": {
+    "experience.md": "# Event 1\nImplemented webhook idempotency handling for duplicate event delivery.\n\n# Event 2\nAdded structured failure logging with request correlation ids.\n\n# Event 3\nCompleted SQLite transaction design for application updates.\n\n# Event 4\nCreated a cloud migration proposal; production cloud migration has not started.\n\n# Event 5\nI have never performed machine learning training."
+  },
+  "initialApplications": []
+}

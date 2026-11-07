@@ -1,0 +1,9 @@
+{
+  "id": "data",
+  "split": "dev",
+  "family": "data-experience-family",
+  "documents": {
+    "experience.md": "# Event 1\n实现了定时对账任务开发，并为重复输入增加去重。\n\n# Event 2\n完成 SQL 数据质量校验，检查主键重复和必填字段。\n\n# Event 3\n实现失败任务告警，并记录失败原因。\n\n# Event 4\n生产向量检索仍是计划，尚未开始实现。\n\n# Event 5\n从未做过 Spark 集群运维。"
+  },
+  "initialApplications": []
+}
