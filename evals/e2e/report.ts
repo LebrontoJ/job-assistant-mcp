@@ -12,7 +12,7 @@ export function summarize(rows:E2EResult[]) {
   const claims=checks.filter(c=>/^claim_\d+_support$/.test(c.name)),unknownClaims=checks.filter(c=>/^claim_\d+_semantic$/.test(c.name));
   const citations=checks.filter(c=>/^claim_\d+_citation$/.test(c.name));
   const stageNames=[...new Set(rows.flatMap(r=>r.stages.map(s=>s.name)))];
-  return {total:rows.length,outcomes:Object.fromEntries(['passed','failed','ungraded','run_error'].map(o=>[o,rows.filter(r=>r.outcome===o).length])),
+  return {total:rows.length,uniqueCases:new Set(rows.map(r=>r.caseId)).size,outcomes:Object.fromEntries(['passed','failed','ungraded','run_error'].map(o=>[o,rows.filter(r=>r.outcome===o).length])),
     operationalCompletion:ratio(rows.filter(r=>r.completed).length,rows.length),
     taskSuccess:ratio(rows.filter(r=>r.outcome==='passed').length,rows.length),
     gradingCompletion:ratio(rows.filter(r=>r.checks.some(c=>c.required)&&r.checks.filter(c=>c.required).every(c=>c.state==='pass'||c.state==='fail')).length,rows.length),

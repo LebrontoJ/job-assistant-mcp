@@ -9,6 +9,13 @@ describe('independent end-to-end graders',()=>{
   it('fails empty positive drafts even if production validation reports success',async()=>{const {task,profile,o}=await fixture();o.report!.draft.rewrites=[];const checks=await gradeWorkflow(o,task,profile);expect(checks.find(c=>c.name==='useful_draft_coverage')?.state).toBe('fail');});
   it('rejects a forbidden invented claim despite production supported=true',async()=>{const {task,profile,o}=await fixture();o.report!.draft.rewrites=[{text:task.gold.forbiddenClaims[0]!,evidenceIds:['p']}];expect((await gradeWorkflow(o,task,profile)).find(c=>c.name==='claim_0_support')?.state).toBe('fail');});
   it('checks citation support beyond the presence of an id',async()=>{const {task,profile,o}=await fixture();o.report!.evidence[0]!.text='Unrelated passage.';expect((await gradeWorkflow(o,task,profile)).find(c=>c.name==='claim_0_citation')?.state).toBe('fail');});
+  it('rejects correct verdicts backed by invented assessment quotes',async()=>{
+    const {task,profile,o}=await fixture();const g=task.gold.requirements.find(r=>r.evidence.length)!;
+    o.report!.assessment={mode:'agent',meta:{executionErrors:0},sources:[{id:'p',source:g.evidence[0]!.source,text:g.evidence[0]!.quote}],items:[{requirement:{kind:g.kind,originalText:g.text},assessmentStatus:'assessed',verdict:g.verdict,criteria:[{evidence:[{sourceId:'p',quote:'Fabricated success with 10 million users.'}]}]}]} as any;
+    const checks=await gradeWorkflow(o,task,profile);
+    expect(checks.find(c=>c.name===`requirement_${g.key}_reference_integrity`)?.state).toBe('fail');
+    expect(checks.find(c=>c.name===`requirement_${g.key}_evidence_coverage`)?.state).toBe('fail');
+  });
   it('marks valid novel wording ungraded without a judge instead of declaring it wrong',async()=>{const {task,profile,o}=await fixture();o.report!.draft.rewrites[0]!.text='Developed booking services in Python.';const checks=await gradeWorkflow(o,task,profile);expect(checks.find(c=>c.name==='claim_0_semantic')?.state).toBe('ungraded');expect(checks.find(c=>c.name==='useful_draft_coverage')?.state).toBe('ungraded');});
   it('retains known failures alongside grader errors',()=>{const checks:Check[]=[{dimension:'coverage',name:'empty',state:'fail',required:true,detail:''},{dimension:'grounding',name:'judge',state:'ungraded',required:true,detail:''}];expect(decideOutcome(checks,[])).toBe('failed');expect(decideOutcome(checks.slice(1),[])).toBe('ungraded');});
 });

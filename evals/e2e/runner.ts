@@ -29,7 +29,18 @@ export async function runCase(task:E2ECase,profile:E2EProfile,opts:RunOptions):P
   const signal=opts.signal?AbortSignal.any([opts.signal,controller.signal]):controller.signal;
   const started=Date.now(),stages:Stage[]=[],errors:E2EResult['errors']=[],checks:Check[]=[];
   let environment:E2EEnvironment|undefined,observation:Observation|undefined,active='startup';
-  const stage=async<T>(name:string,fn:()=>Promise<T>):Promise<T>=>{active=name;const start=Date.now();try{const out=await fn();stages.push({name,ms:Date.now()-start,status:'ok'});return out;}catch(e){stages.push({name,ms:Date.now()-start,status:'error'});throw e;}};
+  const stage=async<T>(name:string,fn:()=>Promise<T>):Promise<T>=>{
+    active=name;const start=Date.now();
+    // Cleanup has its own bounded grace period, including after the case deadline.
+    const stageSignal=name==='cleanup'?AbortSignal.timeout(5000):signal;
+    let abort:()=>void=()=>{};
+    try{
+      stageSignal.throwIfAborted();
+      const out=await Promise.race([fn(),new Promise<never>((_,reject)=>{abort=()=>reject(stageSignal.reason);stageSignal.addEventListener('abort',abort,{once:true});if(stageSignal.aborted)abort();})]);
+      stages.push({name,ms:Date.now()-start,status:'ok'});return out;
+    }catch(e){stages.push({name,ms:Date.now()-start,status:'error'});throw e;}
+    finally{stageSignal.removeEventListener('abort',abort);}
+  };
   const assert=(name:string,pass:boolean,detail='')=>checks.push({dimension:'writing',name,state:pass?'pass':'fail',required:true,detail});
   try {
     if(opts.fault&&opts.fault!=='none'&&(opts.runtime!=='scripted'||opts.matchMode!=='agent'))throw new Error('Faults require scripted agent mode');
@@ -71,13 +82,13 @@ export async function runCase(task:E2ECase,profile:E2EProfile,opts:RunOptions):P
       if(task.workflow==='retry_same_key')assert('idempotent_retry',observation.retryResponse.status===200&&canonical(observation.retryResponse.data)===canonical(observation.decisionResponse.data));
     }
     try{checks.push(...await stage('grading',()=>opts.grade ? opts.grade(observation!,task,profile) : gradeWorkflow(observation!,task,profile,opts.judge)));}
-    catch{checks.push({dimension:'grounding',name:'grader_error',state:'ungraded',required:true,detail:'Grader failed; no model verdict inferred'});}
+    catch{signal.throwIfAborted();checks.push({dimension:'grounding',name:'grader_error',state:'ungraded',required:true,detail:'Grader failed; no model verdict inferred'});}
     }
-  } catch(error) {errors.push({stage:active,kind:error instanceof Error&&/HTTP \d+/.test(error.message)?error.message:'execution_error'});}
+  } catch(error) {const current=stages.at(-1);if(current?.name===active)current.status='error';errors.push({stage:active,kind:error instanceof Error&&/HTTP \d+/.test(error.message)?error.message:'execution_error'});}
   finally {clearTimeout(timer);if(environment)try{await stage('cleanup',()=>environment!.close());}catch{errors.push({stage:'cleanup',kind:'cleanup_error'});}}
   const events=environment?.tracer.events??[];
   const usage={modelCalls:0,inputTokens:0,outputTokens:0,parserCalls:0,parserInputTokens:0,parserOutputTokens:0};
   for(const e of events)if(e.type==='llm_call'){usage.modelCalls++;usage.inputTokens+=e.inputTokens;usage.outputTokens+=e.outputTokens;}else if(e.type==='jd_parse'){usage.parserCalls+=e.apiCalls;usage.parserInputTokens+=e.inputTokens;usage.parserOutputTokens+=e.outputTokens;}
   return {caseId:task.id,profileId:task.profileId,jdFamily:task.jdFamily,split:task.split,sample:opts.sample??0,runtime:opts.runtime,matchMode:opts.runtime==='offline'?'retrieval':opts.matchMode,experiment:opts.parserReplay?'matching_ablation':'full_workflow',track:opts.fault&&opts.fault!=='none'?'reliability':'workflow',fault:opts.fault??'none',officialEligible:opts.officialEligible??false,outcome:decideOutcome(checks,errors),completed:!!observation?.final&&!errors.length,checks,stages,errors,ms:Date.now()-started,usage,
-    ...(opts.artifacts===false?{}:{artifacts:{inputJdHash:hash(task.jd),configuration:environment?.configuration,report:observation?.report,checks,trace:events.map(e=>{const {user,args,result,detail,...safe}=e as any;return safe;})}})};
+    ...(opts.artifacts===false?{}:{artifacts:{inputJdHash:hash(task.jd.trim()),configuration:environment?.configuration,report:observation?.report,checks,trace:events.map(e=>{const {user,args,result,detail,...safe}=e as any;return safe;})}})};
 }

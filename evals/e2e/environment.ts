@@ -38,7 +38,7 @@ export async function createEnvironment(profile: E2EProfile, opts: EnvironmentOp
     const scripted=opts.runtime==='scripted' ? scriptedProviders(opts.fault,opts.observe) : undefined;
     const env=opts.env ?? process.env;
     const baseParser=scripted ? new JdParsingService({extractor:scripted.extractor,timeoutMs:opts.fault==='parser_timeout'?20:1000}) : createJdParser({...env,JD_PARSER_CACHE_DIR:'off'},{offline:opts.runtime==='offline'});
-    const parser=opts.parserReplay?{parse:async(text:string,signal?:AbortSignal)=>{signal?.throwIfAborted();if(hash(text)!==opts.parserReplay!.jdHash)throw new Error('Parser replay JD hash mismatch');return {data:structuredClone(opts.parserReplay!.data),meta:{method:'rules' as const,version:'e2e-replay-v1',cacheHit:true,ms:0,apiCalls:0,inputTokens:0,outputTokens:0,warnings:['Controlled replay; not fresh JD parsing.']}};}}:baseParser;
+    const parser=opts.parserReplay?{parse:async(text:string,signal?:AbortSignal)=>{signal?.throwIfAborted();if(hash(text.trim())!==opts.parserReplay!.jdHash)throw new Error('Parser replay JD hash mismatch');return {data:structuredClone(opts.parserReplay!.data),meta:{method:'rules' as const,version:'e2e-replay-v1',cacheHit:true,ms:0,apiCalls:0,inputTokens:0,outputTokens:0,warnings:['Controlled replay; not fresh JD parsing.']}};}}:baseParser;
     const matching:MatchingOptions=scripted ? {mode:opts.matchMode,llm:scripted.llm,batchSize:opts.fault==='match_failure'?1:6,totalMs:5000,callMs:1000} : createMatching({...env,MATCH_MODE:opts.matchMode,MATCH_CACHE:'off'},opts.runtime==='offline');
     const llm=scripted?.llm ?? (opts.runtime==='live'?createLLM({},env):undefined);
     opts.signal?.throwIfAborted();

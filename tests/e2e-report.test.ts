@@ -1,5 +1,6 @@
 import { describe,it,expect } from 'vitest';
 import { summarize,buildReport } from '../evals/e2e/report.js';
+import { createEnvironment } from '../evals/e2e/environment.js';
 import { runCase } from '../evals/e2e/runner.js';
 import { loadCases } from '../evals/e2e/load.js';
 import type { E2EResult } from '../evals/e2e/types.js';
@@ -11,5 +12,15 @@ describe('e2e reports and bounds',()=>{
     const report=buildReport([...rows,{...row('passed'),track:'reliability',fault:'lost_response'}],{});expect(Object.keys(report.byGroup)).toHaveLength(2);
   });
   it('bounds a hanging startup factory',async()=>{const {task,profile}=(await loadCases('dev'))[0]!;const result=await runCase(task,profile,{runtime:'offline',matchMode:'retrieval',caseTimeoutMs:30,makeEnvironment:async()=>new Promise(()=>{})});expect(result.outcome).toBe('run_error');expect(result.errors[0]?.stage).toBe('startup');});
+  it('bounds a hanging grader without accepting it as a pass',async()=>{
+    const {task,profile}=(await loadCases('dev'))[0]!;
+    const result=await runCase(task,profile,{runtime:'offline',matchMode:'retrieval',caseTimeoutMs:2000,grade:async()=>new Promise(()=>{})});
+    expect(result.outcome).toBe('run_error');expect(result.errors[0]?.stage).toBe('grading');
+  });
+  it('retains cleanup failures even when the workflow passes',async()=>{
+    const {task,profile}=(await loadCases('dev'))[0]!;
+    const result=await runCase(task,profile,{runtime:'offline',matchMode:'retrieval',makeEnvironment:async(...args)=>{const env=await createEnvironment(...args);return {...env,close:async()=>{await env.close();throw new Error('cleanup failure');}};}});
+    expect(result.outcome).toBe('run_error');expect(result.errors).toContainEqual({stage:'cleanup',kind:'cleanup_error'});
+  });
   it('records a grader exception as ungraded rather than a model failure',async()=>{const {task,profile}=(await loadCases('dev'))[0]!;const result=await runCase(task,profile,{runtime:'scripted',matchMode:'agent',grade:async()=>{throw new Error('bad judge');}});expect(result.outcome).toBe('ungraded');expect(result.errors).toEqual([]);});
 });

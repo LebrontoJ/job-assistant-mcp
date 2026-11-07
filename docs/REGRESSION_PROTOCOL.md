@@ -18,3 +18,5 @@ Historical live results (95/99 case-runs) remain in EVALS.md. They are NOT a new
 
 01 baseline/protocol; 02 structured evidence report; 03 bounded validation/repair; 04 exact explicit approvals;
 05 transactions/idempotency; 06 timeout/recovery; 07 correlated redacted trace; 08 local JD-to-board app.
+
+The separate [e2e-v1 workflow protocol](E2E_EVALUATION.md) adds raw-JD HTTP/MCP/SQLite execution, independent graders, blind review gates and paired matching studies. Its candidate labels are provisional; do not merge scripted host scores with historical live agent scores.

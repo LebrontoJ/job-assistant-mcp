@@ -40,6 +40,22 @@ export async function gradeWorkflow(o:Observation,task:E2ECase,profile:E2EProfil
     add('matching','false_support',falseSupport===0,'False supported judgments',falseSupport,negatives.length);
     add('matching','false_rejection',falseReject===0,'Supported requirements not recognized',falseReject,positives.length);
     add('matching','matching_execution',!r.assessment.meta.executionErrors&&r.assessment.items.every(i=>i.assessmentStatus==='assessed'),'All necessary assessments completed without execution errors');
+    // A correct verdict with a fabricated or unrelated source is still not a grounded assessment.
+    const judged=gold.requirements.map(g=>({g,item:r.assessment.items.find(i=>i.requirement.kind===g.kind&&normalize(i.requirement.originalText)===normalize(g.text))}));
+    for(const {g,item} of judged) {
+      const citations=item?.criteria.flatMap(c=>c.evidence)??[];
+      const valid=citations.every(ref=>{
+        const source=r.assessment.sources.find(s=>s.id===ref.sourceId);
+        return !!source&&source.text.includes(ref.quote)&&!!profile.documents[source.source]?.includes(source.text);
+      });
+      add('matching',`requirement_${g.key}_reference_integrity`,valid,'Assessment quotes must resolve to actual corpus passages');
+      const covered=g.evidence.filter(ref=>citations.some(c=>{
+        const source=r.assessment.sources.find(s=>s.id===c.sourceId);
+        return source?.source===ref.source&&normalize(c.quote).includes(normalize(ref.quote));
+      })).length;
+      add('matching',`requirement_${g.key}_evidence_coverage`,covered===g.evidence.length,'Assessment must cite the labelled supporting/contradicting passages',covered,g.evidence.length);
+    }
+
   }
   add('coverage','draft_available',r.draftStatus!=='unavailable','Draft provider failure is not an empty-but-successful draft');
   const credited=new Set<string>();let uncertain=false;
@@ -49,7 +65,7 @@ export async function gradeWorkflow(o:Observation,task:E2ECase,profile:E2EProfil
     add('grounding',`claim_${index}_reference_integrity`,validRefs,'References must resolve to actual corpus passages');
     const facts=gold.facts.filter(f=>normalize(f.quote)===normalize(claim.text));
     if(gold.forbiddenClaims.some(f=>normalize(f)===normalize(claim.text))) {
-      add('grounding',`claim_${index}_support`,false,'Explicitly forbidden unsupported assertion',0,1);continue;
+      add('grounding',`claim_${index}_support`,false,'Explicitly forbidden unsupported assertion',0,1);add('grounding',`claim_${index}_citation`,false,'Forbidden assertion is not supported by its citation',0,1);continue;
     }
     if(facts.length) {
       facts.forEach(f=>credited.add(f.key));

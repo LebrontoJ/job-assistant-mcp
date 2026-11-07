@@ -22,8 +22,8 @@ describe('independent review and controlled comparisons',()=>{
     const {task,profile}=(await loadCases('dev'))[0]!;
     const fresh=await runCase(task,profile,{runtime:'scripted',matchMode:'assessment'});
     const parsed=(fresh.artifacts!.report as any).jd;
-    const replayed=await runCase(task,profile,{runtime:'scripted',matchMode:'agent',parserReplay:{jdHash:hash(task.jd),data:parsed}});
-    expect(replayed.experiment).toBe('matching_ablation');expect(replayed.usage.parserCalls).toBe(0);
+    const replayed=await runCase(task,profile,{runtime:'scripted',matchMode:'agent',parserReplay:{jdHash:hash(task.jd.trim()),data:parsed}});
+    expect(replayed.outcome).toBe('passed');expect(replayed.experiment).toBe('matching_ablation');expect(replayed.usage.parserCalls).toBe(0);
     expect(pairedComparisons([fresh,replayed]).pairs).toHaveLength(0);
     expect(pairedComparisons([fresh,{...replayed,experiment:'full_workflow'}]).pairs).toHaveLength(1);
     const bad=await runCase(task,profile,{runtime:'scripted',matchMode:'agent',parserReplay:{jdHash:'wrong',data:parsed}});expect(bad.outcome).toBe('run_error');

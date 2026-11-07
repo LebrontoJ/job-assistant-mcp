@@ -30,7 +30,7 @@ const allCases=await loadCases(split),cases=allCases.slice(0,limit);
 if(purpose==='audit'&&cases.some(({task,profile})=>!auditEligible(task,profile,records)))throw new Error('Audit locked: labels are missing independent agreement, disputed or stale');
 const replayText=values['parser-replay']?await readFile(values['parser-replay'],'utf8'):undefined;
 const replay=replayText?ReplaySchema.parse(JSON.parse(replayText)):undefined;
-if(replay&&cases.some(({task})=>replay.cases[task.id]?.jdHash!==hash(task.jd)))throw new Error('Replay must match every selected raw JD hash');
+if(replay&&cases.some(({task})=>replay.cases[task.id]?.jdHash!==hash(task.jd.trim())))throw new Error('Replay must match every selected raw JD hash');
 if(runtime==='live'){try{process.loadEnvFile('.env');}catch{/* explicit environment */}}
 let judge:ReturnType<typeof createSemanticJudge>|undefined;
 const judgeUsage={calls:0,inputTokens:0,outputTokens:0};let judgeIdentity:unknown;

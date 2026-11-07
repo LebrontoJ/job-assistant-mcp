@@ -21,3 +21,12 @@ jobs:
       - run: pnpm test
       # BM25 retrieval metrics only: needs no API key and no network.
       - run: pnpm eval:retrieval
+      # HTTP/MCP/SQLite workflow gates; synthetic fixtures, no external API calls.
+      - run: pnpm eval:e2e --mode=offline --limit=1 --gate=pass --output=evals/results/e2e-offline.json
+      - run: pnpm eval:e2e --mode=scripted --compare=matching --limit=1 --gate=pass --output=evals/results/e2e-scripted.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-host-reports
+          path: evals/results/e2e-*.json
+          if-no-files-found: ignore
