@@ -33,6 +33,11 @@ export async function gradeWorkflow(o:Observation,task:E2ECase,profile:E2EProfil
   else {
     const exact=gold.requirements.filter(g=>r.assessment.items.some(i=>i.requirement.kind===g.kind&&normalize(i.requirement.originalText)===normalize(g.text)&&i.assessmentStatus==='assessed'&&i.verdict===g.verdict)).length;
     add('matching','requirement_judgments',exact===gold.requirements.length,'Judgments compared to independent label file, not production rules',exact,gold.requirements.length);
+    const predicted=(g:typeof gold.requirements[number])=>r.assessment.items.find(i=>i.requirement.kind===g.kind&&normalize(i.requirement.originalText)===normalize(g.text))?.verdict;
+    const negatives=gold.requirements.filter(g=>g.verdict!=='supported'),positives=gold.requirements.filter(g=>g.verdict==='supported');
+    const falseSupport=negatives.filter(g=>predicted(g)==='supported').length,falseReject=positives.filter(g=>predicted(g)!=='supported').length;
+    add('matching','false_support',falseSupport===0,'False supported judgments',falseSupport,negatives.length);
+    add('matching','false_rejection',falseReject===0,'Supported requirements not recognized',falseReject,positives.length);
     add('matching','matching_execution',!r.assessment.meta.executionErrors&&r.assessment.items.every(i=>i.assessmentStatus==='assessed'),'All necessary assessments completed without execution errors');
   }
   add('coverage','draft_available',r.draftStatus!=='unavailable','Draft provider failure is not an empty-but-successful draft');
@@ -40,6 +45,7 @@ export async function gradeWorkflow(o:Observation,task:E2ECase,profile:E2EProfil
   for(const [index,claim] of r.draft.rewrites.entries()) {
     const sources=claim.evidenceIds.flatMap(id=>r.evidence.filter(s=>s.id===id));
     const validRefs=claim.evidenceIds.length>0&&sources.length===claim.evidenceIds.length&&sources.every(s=>profile.documents[s.source]?.includes(s.text));
+    add('grounding',`claim_${index}_reference_integrity`,validRefs,'References must resolve to actual corpus passages');
     const facts=gold.facts.filter(f=>normalize(f.quote)===normalize(claim.text));
     if(gold.forbiddenClaims.some(f=>normalize(f)===normalize(claim.text))) {
       add('grounding',`claim_${index}_support`,false,'Explicitly forbidden unsupported assertion',0,1);continue;

@@ -22,13 +22,24 @@ export function decideOutcome(checks:Check[],errors:E2EResult['errors']):E2EResu
   return checks.some(c=>c.required)?'passed':'ungraded';
 }
 export async function runCase(task:E2ECase,profile:E2EProfile,opts:RunOptions):Promise<E2EResult> {
+  const controller=new AbortController();
+  const timeoutMs=opts.caseTimeoutMs??240000;
+  if(!Number.isInteger(timeoutMs)||timeoutMs<1)throw new Error('Invalid case timeout');
+  const timer=setTimeout(()=>controller.abort(new DOMException('Case deadline exceeded','TimeoutError')),timeoutMs);
+  const signal=opts.signal?AbortSignal.any([opts.signal,controller.signal]):controller.signal;
   const started=Date.now(),stages:Stage[]=[],errors:E2EResult['errors']=[],checks:Check[]=[];
   let environment:E2EEnvironment|undefined,observation:Observation|undefined,active='startup';
   const stage=async<T>(name:string,fn:()=>Promise<T>):Promise<T>=>{active=name;const start=Date.now();try{const out=await fn();stages.push({name,ms:Date.now()-start,status:'ok'});return out;}catch(e){stages.push({name,ms:Date.now()-start,status:'error'});throw e;}};
   const assert=(name:string,pass:boolean,detail='')=>checks.push({dimension:'writing',name,state:pass?'pass':'fail',required:true,detail});
   try {
     if(opts.fault&&opts.fault!=='none'&&(opts.runtime!=='scripted'||opts.matchMode!=='agent'))throw new Error('Faults require scripted agent mode');
-    environment=await stage('startup',()=> (opts.makeEnvironment??createEnvironment)(profile,opts));
+    environment=await stage('startup',async()=>{
+      const pending=(opts.makeEnvironment??createEnvironment)(profile,{...opts,signal});
+      void pending.then(late=>{if(signal.aborted&&!environment)return late.close();}).catch(()=>{});
+      let abort:()=>void=()=>{};
+      try{return await Promise.race([pending,new Promise<never>((_,reject)=>{abort=()=>reject(signal.reason);signal.addEventListener('abort',abort,{once:true});if(signal.aborted)abort();})]);}
+      finally{signal.removeEventListener('abort',abort);}
+    });
     if(opts.fault&&opts.fault!=='none'){
       const result=await stage('reliability',()=>runFault(environment!,task,opts.fault as Exclude<NonNullable<RunOptions['fault']>,'none'>));
       observation=result.observation;checks.push(...result.checks);
@@ -63,10 +74,10 @@ export async function runCase(task:E2ECase,profile:E2EProfile,opts:RunOptions):P
     catch{checks.push({dimension:'grounding',name:'grader_error',state:'ungraded',required:true,detail:'Grader failed; no model verdict inferred'});}
     }
   } catch(error) {errors.push({stage:active,kind:error instanceof Error&&/HTTP \d+/.test(error.message)?error.message:'execution_error'});}
-  finally {if(environment)try{await stage('cleanup',()=>environment!.close());}catch{errors.push({stage:'cleanup',kind:'cleanup_error'});}}
+  finally {clearTimeout(timer);if(environment)try{await stage('cleanup',()=>environment!.close());}catch{errors.push({stage:'cleanup',kind:'cleanup_error'});}}
   const events=environment?.tracer.events??[];
   const usage={modelCalls:0,inputTokens:0,outputTokens:0,parserCalls:0,parserInputTokens:0,parserOutputTokens:0};
   for(const e of events)if(e.type==='llm_call'){usage.modelCalls++;usage.inputTokens+=e.inputTokens;usage.outputTokens+=e.outputTokens;}else if(e.type==='jd_parse'){usage.parserCalls+=e.apiCalls;usage.parserInputTokens+=e.inputTokens;usage.parserOutputTokens+=e.outputTokens;}
   return {caseId:task.id,profileId:task.profileId,jdFamily:task.jdFamily,split:task.split,sample:opts.sample??0,runtime:opts.runtime,matchMode:opts.runtime==='offline'?'retrieval':opts.matchMode,track:opts.fault&&opts.fault!=='none'?'reliability':'workflow',fault:opts.fault??'none',officialEligible:opts.officialEligible??false,outcome:decideOutcome(checks,errors),completed:!!observation?.final&&!errors.length,checks,stages,errors,ms:Date.now()-started,usage,
-    ...(opts.artifacts===false?{}:{artifacts:{report:observation?.report,checks,trace:events.map(e=>{const {user,args,result,detail,...safe}=e as any;return safe;})}})};
+    ...(opts.artifacts===false?{}:{artifacts:{configuration:environment?.configuration,report:observation?.report,checks,trace:events.map(e=>{const {user,args,result,detail,...safe}=e as any;return safe;})}})};
 }
