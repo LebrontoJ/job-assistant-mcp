@@ -35,6 +35,8 @@ export interface Usage {
 
 export interface ChatRequest {
   signal?: AbortSignal;
+  /** Optional native structured output; hosts still validate the returned JSON. */
+  responseSchema?: Record<string, unknown>;
   system: string;
   messages: Message[];
   tools: ToolSpec[];

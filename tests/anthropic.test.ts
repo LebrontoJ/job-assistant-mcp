@@ -172,3 +172,14 @@ describe("createEmbedding", () => {
     expect(createEmbedding({ ...base, EMBEDDING_DIMENSIONS: "1536" }).minSimilarity).toBeUndefined();
   });
 });
+
+it('transforms native structured output constraints without mutating the host schema', async () => {
+  const { api, calls } = fake([ok()]);
+  const schema = { type: 'object', properties: { value: { type: 'string', minLength: 1, maxLength: 40 } }, required: ['value'], additionalProperties: false };
+  await new AnthropicClient('m', { client: api }).chat({ ...req, responseSchema: schema });
+  const format = (calls[0]!.params.output_config as any).format;
+  expect(format.type).toBe('json_schema');
+  expect(format.schema.properties.value).not.toHaveProperty('minLength');
+  expect(format.schema.additionalProperties).toBe(false);
+  expect(schema.properties.value.minLength).toBe(1);
+});

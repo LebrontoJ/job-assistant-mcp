@@ -50,3 +50,5 @@ pnpm trace .traces/app
 验收截图（隔离的合成资料，看板从 4 条变为 5 条）：
 
 ![确认后更新的示例看板](assets/app-board.png)
+
+逐条要求评估：实时模式默认启用只读匹配 Agent，可通过 `MATCH_MODE=assessment` 使用单次结构化判断，或 `MATCH_MODE=retrieval` 保留检索基线。报告分别显示硬性要求/加分项的直接支持、部分支持、信息不足、明确不符和未完成评估数量，并提供原文、判断理由与待确认信息。年限尚未独立核算，不输出总匹配百分比。离线模式明确标记尚未语义评估。配置、预算及评测说明见 [RESUME_MATCHING.md](RESUME_MATCHING.md)。

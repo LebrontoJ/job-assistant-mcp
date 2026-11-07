@@ -19,8 +19,10 @@ function options(select, value) {
   select.replaceChildren(...config.statuses.map(status => { const option = el('option', labels[status] ?? status); option.value = status; option.selected = status === value; return option; }));
 }
 function section(title) { const node = el('section', undefined, 'report-section'); node.append(el('h3', title)); return node; }
+function showMode(matchingMode) { $('mode').textContent = `${config.mode === 'live' ? `草稿模型 · ${config.model}` : '资料原文摘录'} · 匹配：${{ retrieval: '仅检索', assessment: '结构化判断', agent: '补检 Agent' }[matchingMode]}`; }
 function showReport(data) {
   report = data;
+  showMode(data.assessment?.mode ?? config.matching?.mode ?? 'retrieval');
   $('empty').hidden = true; $('report').hidden = false; $('report').replaceChildren();
   $('report-status').textContent = `${data.requirements.length} 条岗位要求`;
   if (data.parsing) {
@@ -29,21 +31,48 @@ function showReport(data) {
     $('report').append(el('p', `JD · ${status}${data.parsing.cacheHit ? ' · 已复用解析结果' : ''}`, 'muted'));
   }
   $('step2').classList.add('active');
-  const requirementSection = section('01 / 岗位要求与检索依据');
-  requirementSection.append(el('p', '以下为检索信号。相关片段不等于满足要求，请核查原文；年限尚未自动计算。', 'muted'));
-  for (const item of data.requirements) {
+  const requirementSection = section('01 / 岗位要求与证据判断');
+  const assessment = data.assessment;
+  if (assessment) {
+    for (const [kind, title] of [['requirement', '硬性要求'], ['nice_to_have', '加分项']]) {
+      const counts = assessment.summary[kind];
+      requirementSection.append(el('p', `${title} ${counts.total} 项：直接支持 ${counts.supported} · 部分支持 ${counts.partial} · 信息不足 ${counts.insufficient} · 明确不符 ${counts.contradicted} · 未完成评估 ${counts.unassessed}`));
+    }
+    requirementSection.append(el('p', assessment.mode === 'retrieval' ? '当前仅做检索，未完成语义评估。' : `模型证据判断需人工核对。补充检索 ${assessment.meta.searches} 次；${assessment.meta.executionErrors ? `执行中有 ${assessment.meta.executionErrors} 次失败或拦截，已保留可用判断；可重试` : assessment.meta.stoppedBecause === 'completed' ? '评估已完成' : '部分结果或受限结果，请查看各项状态'}。`, 'muted'));
+  }
+  requirementSection.append(el('p', '证据判断与检索信号分别展示。请核对原文；年限尚未独立核算。', 'muted'));
+  for (const [index, item] of data.requirements.entries()) {
     const row = el('div', undefined, 'requirement');
-    row.append(el('span', { supported: '有词面依据', weak: '需进一步核实', no_evidence: '未找到依据' }[item.support], `support ${item.support}`), el('p', item.item));
+    const judged = assessment?.items[index];
+    if (judged?.assessmentStatus === 'assessed') {
+      const titles = { supported: '直接支持', partial: '部分支持', insufficient: '信息不足', contradicted: '明确不符' };
+      row.append(el('span', titles[judged.verdict], `support ${judged.verdict}`), el('p', item.item));
+      for (const criterion of judged.criteria) {
+        const original = judged.requirement.criteria.find(c => c.id === criterion.criterionId);
+        row.append(el('p', `${original?.text ?? ''}：${titles[criterion.verdict]} · ${criterion.reason}`));
+        for (const ref of criterion.evidence) {
+          const details = el('details');
+          const source = data.evidence.find(e => e.id === ref.sourceId);
+          details.append(el('summary', `判断依据 · ${ref.sourceId}`), el('blockquote', ref.quote), el('div', source?.text ?? '', 'source')); row.append(details);
+        }
+        for (const missing of criterion.missingInformation) row.append(el('p', `待确认：${missing}`, 'muted'));
+      }
+    } else {
+      const states = { unassessed: '尚未进行语义评估', timeout: '评估超时', failed: '评估失败', context_limited: '证据或要求数量超出预算' };
+      row.append(el('span', judged ? states[judged.assessmentStatus] : '仅检索信号', 'support weak'), el('p', item.item));
+    }
+    const signals = el('details'); signals.append(el('summary', `检索信号 · ${item.support} · 词面覆盖 ${item.coverage}`));
     for (const evidence of item.evidence) {
       const source = data.evidence.find(e => e.id === evidence.chunkId);
-      const details = el('details'); details.append(el('summary', `查看依据 · ${evidence.chunkId}`), el('div', source?.text ?? evidence.excerpt, 'source')); row.append(details);
+      const details = el('details'); details.append(el('summary', `查看依据 · ${evidence.chunkId}`), el('div', source?.text ?? evidence.excerpt, 'source')); signals.append(details);
     }
+    row.append(signals);
     requirementSection.append(row);
   }
   if (!data.requirements.length) requirementSection.append(el('p', '未识别到独立要求。请补充职责或要求部分。', 'muted'));
   $('report').append(requirementSection);
   const drafts = section('02 / 可采用的经历表达');
-  drafts.append(el('p', config.mode === 'live' ? '仅展示通过证据校验的改写。语义校验仍可能出错，请人工核对。' : '离线模式展示原文摘录，不进行模型改写。', 'muted'));
+  drafts.append(el('p', data.draftStatus === 'unavailable' ? '草稿生成暂不可用；已保留岗位证据判断，可稍后重试。' : data.draftStatus === 'generated' ? '仅展示通过证据校验的改写。语义校验仍可能出错，请人工核对。' : '以下展示原文摘录，不进行模型改写。', 'muted'));
   for (const item of data.draft.rewrites) {
     const bullet = el('div', undefined, 'bullet'); bullet.append(el('div', item.text));
     for (const id of item.evidenceIds) { const link = el('a', `[${id}]`, 'citation'); link.href = `#source-${data.evidence.findIndex(e => e.id === id)}`; bullet.append(link); }
@@ -163,7 +192,7 @@ $('refresh').addEventListener('click', () => refreshBoard().catch(error => notic
 (async () => {
   try {
     const res = await fetch('/api/config'); if (!res.ok) throw new Error('无法连接本地服务'); config = await res.json();
-    $('mode').textContent = config.mode === 'live' ? `实时模型 · ${config.model}` : '离线模式 · 资料摘录';
+    showMode(config.matching?.mode ?? 'retrieval');
     options($('new-status'), 'wishlist'); await refreshBoard();
   } catch (error) { notice(error.message, true); $('analyse').disabled = true; }
 })();

@@ -153,3 +153,5 @@ source text, but source presence alone cannot prove correct interpretation of ne
 Run `pnpm eval:jd` for the labelled synthetic rule baseline and `pnpm eval:jd --live` for a live comparison.
 The latter explicitly calls the configured Gemini API; automatic tests use fake SDK responses only.
 See [the implementation plan](docs/GEMINI_PARSING_PLAN.md) for scope and validation details.
+
+Requirement-level matching: `APP_MODE=live MATCH_MODE=agent pnpm app` uses the configured Gemini/Anthropic model to assess evidence, optionally search for missing evidence, and show per-requirement verdicts with source quotes. `MATCH_MODE=assessment` disables supplementary search; `MATCH_MODE=retrieval` preserves the retrieval baseline. Offline remains model-free. See [matching configuration and evaluation](docs/RESUME_MATCHING.md); `pnpm eval:matching` runs the synthetic offline baseline without API calls.

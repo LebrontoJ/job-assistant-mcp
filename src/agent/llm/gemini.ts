@@ -72,6 +72,7 @@ export class GeminiClient implements LLMClient {
           config: {
             systemInstruction: req.system,
             abortSignal: req.signal,
+            ...(req.responseSchema ? { responseMimeType: "application/json", responseJsonSchema: sanitizeSchema(req.responseSchema) } : {}),
             tools: req.tools.length ? [{ functionDeclarations: toDeclarations(req.tools) }] : undefined,
           },
         }),

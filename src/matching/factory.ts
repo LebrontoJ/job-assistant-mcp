@@ -1,0 +1,19 @@
+import { MatchCache } from './cache.js';
+import { createLLM } from '../agent/llm/index.js';
+import { ModeSchema } from './types.js';
+import type { MatchingOptions } from './agent.js';
+/** Matching has independent model settings; offline hosts never instantiate a provider. */
+export function createMatching(env: NodeJS.ProcessEnv = process.env, offline = false): MatchingOptions {
+  const mode = offline ? 'retrieval' : ModeSchema.parse(env.MATCH_MODE ?? 'agent');
+  if (mode === 'retrieval') return { mode };
+  const provider = env.MATCH_PROVIDER || env.LLM_PROVIDER;
+  const llm = createLLM({ provider, model: env.MATCH_MODEL || undefined }, env);
+  const integer = (name: string, fallback: number, min: number, max: number) => {
+    const value = env[name] === undefined ? fallback : Number(env[name]);
+    if (!Number.isInteger(value) || value < min || value > max) throw new Error(`${name} must be ${min}..${max}`);
+    return value;
+  };
+  return { mode, llm, cache: env.MATCH_CACHE === 'off' ? undefined : new MatchCache(),
+    totalMs: integer('MATCH_TOTAL_MS', 90_000, 1, 120_000), callMs: integer('MATCH_CALL_MS', 30_000, 1, 60_000),
+    maxRounds: integer('MATCH_MAX_ROUNDS', 2, 0, 2), maxSearches: integer('MATCH_MAX_SEARCHES', 6, 0, 6) };
+}

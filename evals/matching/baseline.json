@@ -1,0 +1,55 @@
+{
+  "date": "2026-11-06T23:36:05.666Z",
+  "version": "match-v1",
+  "split": "dev",
+  "repeat": 1,
+  "casesHash": "532c032bc82c9df59d5629b1232844fa29d12c4feac0f68fa786d16360013a08",
+  "live": false,
+  "cache": "disabled",
+  "scope": "Synthetic author-labelled fixtures; retrieval verdicts are a label projection; goldEvidenceOverlap is a source/quote overlap proxy, not semantic citation accuracy. No live improvement claim from scripted tests.",
+  "byMode": {
+    "retrieval": {
+      "total": 40,
+      "errors": 0,
+      "completion": {
+        "numerator": 40,
+        "denominator": 40,
+        "rate": 1
+      },
+      "exact": {
+        "numerator": 16,
+        "denominator": 40,
+        "rate": 0.4
+      },
+      "falseSupport": {
+        "numerator": 16,
+        "denominator": 25,
+        "rate": 0.64
+      },
+      "supportPrecision": {
+        "numerator": 10,
+        "denominator": 26,
+        "rate": 0.38461538461538464
+      },
+      "falseRejection": {
+        "numerator": 5,
+        "denominator": 15,
+        "rate": 0.3333333333333333
+      },
+      "goldEvidenceOverlap": {
+        "numerator": 0,
+        "denominator": 0,
+        "rate": null
+      },
+      "searches": 0,
+      "modelCalls": 0,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "ms": {
+        "p50": 0,
+        "p95": 1
+      }
+    }
+  },
+  "baselineSourceHash": "66ebbfdd974218c14f7eef51643535fa8e0f1c3fcf8d3b6abe7712aa65cd0d03"
+}

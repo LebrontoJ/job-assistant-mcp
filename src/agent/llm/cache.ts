@@ -46,6 +46,7 @@ export class CachingLLM implements LLMClient {
       system: req.system,
       messages: normalise(req.messages),
       tools: req.tools,
+      ...(req.responseSchema ? { responseSchema: req.responseSchema } : {}),
       ...(this.salt ? { salt: this.salt } : {}),
     });
     return createHash("sha256").update(payload).digest("hex");

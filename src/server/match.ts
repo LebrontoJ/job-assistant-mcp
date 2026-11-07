@@ -1,3 +1,5 @@
+import { collectEvidence } from '../matching/evidence.js';
+import { digest, type EvidenceBundle } from '../matching/types.js';
 import type { ProfileIndex } from "../rag/index.js";
 import { tokenize } from "../rag/tokenize.js";
 import type { ParsedJd } from "./jd.js";
@@ -32,6 +34,7 @@ export interface SkillMatch {
 }
 
 export interface MatchReport {
+  evidenceBundle?: EvidenceBundle;
   items: ItemMatch[];
   skills: SkillMatch[];
   summary: { requirements: Record<Support, number>; skillsFound: number; skillsMissing: string[] };
@@ -50,6 +53,7 @@ export interface SemanticThresholds {
 }
 
 export interface MatchOptions {
+  includeEvidence?: boolean;
   semantic?: SemanticThresholds;
 }
 
@@ -106,8 +110,11 @@ export async function matchProfile(jd: ParsedJd, index: ProfileIndex, opts: Matc
   ];
 
   const items: ItemMatch[] = [];
+  const candidates = new Map<string, Awaited<ReturnType<ProfileIndex["search"]>>>();
   for (const { kind, item } of wanted) {
-    const hits = await index.search(item, 3);
+    const allHits = await index.search(item, opts.includeEvidence ? 5 : 3);
+    candidates.set(item, allHits);
+    const hits = allHits.slice(0, 3);
     const best = bestByCoverage(hits);
     const coverage = best?.coverage ?? 0;
     const sims = hits.flatMap((h) => (h.similarity === undefined ? [] : [h.similarity]));
@@ -149,7 +156,9 @@ export async function matchProfile(jd: ParsedJd, index: ProfileIndex, opts: Matc
 
   const reqs = items.filter((i) => i.kind === "requirement");
   const count = (s: Support) => reqs.filter((i) => i.support === s).length;
+  const evidenceBundle = opts.includeEvidence ? await collectEvidence(jd, async query => (candidates.get(query) ?? []).map(h => h.chunk), {}, digest(index.chunks)) : undefined;
   return {
+    ...(evidenceBundle ? { evidenceBundle } : {}),
     items,
     skills,
     summary: {

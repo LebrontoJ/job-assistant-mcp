@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "authorship": "Synthetic, author-labelled. Development and frozen acceptance fixtures; not an independent population benchmark.",
+  "protocol": "match-v1; unverified durations are partial, not verified support",
+  "files": {
+    "dev.jsonl": "b6341d2b571406c57973033329c39162a8a17289b13b12b42e06f4e9b4e1b025",
+    "heldout.jsonl": "af7181c85871df9e2c5f9ea05271641827eaaf64498699c80ea247d994538348"
+  }
+}
