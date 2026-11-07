@@ -1,3 +1,4 @@
+import { runFault } from './faults.js';
 import { gradeWorkflow, type SemanticJudge } from './grading.js';
 import type { TaskReport } from '../../src/agent/task.js';
 import { createEnvironment, type E2EEnvironment, type EnvironmentOptions } from './environment.js';
@@ -26,7 +27,12 @@ export async function runCase(task:E2ECase,profile:E2EProfile,opts:RunOptions):P
   const stage=async<T>(name:string,fn:()=>Promise<T>):Promise<T>=>{active=name;const start=Date.now();try{const out=await fn();stages.push({name,ms:Date.now()-start,status:'ok'});return out;}catch(e){stages.push({name,ms:Date.now()-start,status:'error'});throw e;}};
   const assert=(name:string,pass:boolean,detail='')=>checks.push({dimension:'writing',name,state:pass?'pass':'fail',required:true,detail});
   try {
+    if(opts.fault&&opts.fault!=='none'&&(opts.runtime!=='scripted'||opts.matchMode!=='agent'))throw new Error('Faults require scripted agent mode');
     environment=await stage('startup',()=> (opts.makeEnvironment??createEnvironment)(profile,opts));
+    if(opts.fault&&opts.fault!=='none'){
+      const result=await stage('reliability',()=>runFault(environment!,task,opts.fault as Exclude<NonNullable<RunOptions['fault']>,'none'>));
+      observation=result.observation;checks.push(...result.checks);
+    }else{
     observation={initial:environment.inspect()};
     const analysed=await stage('analyse',()=>environment!.request('/api/analyse',{jd:task.jd}));
     if(analysed.status!==200)throw new Error(`HTTP ${analysed.status}`);
@@ -53,7 +59,9 @@ export async function runCase(task:E2ECase,profile:E2EProfile,opts:RunOptions):P
       assert('operation_result_committed',observation.final.operations.some(o=>o.id===operationId&&!!o.result));
       if(task.workflow==='retry_same_key')assert('idempotent_retry',observation.retryResponse.status===200&&canonical(observation.retryResponse.data)===canonical(observation.decisionResponse.data));
     }
-    checks.push(...await stage('grading',()=>opts.grade ? opts.grade(observation!,task,profile) : gradeWorkflow(observation!,task,profile,opts.judge)));
+    try{checks.push(...await stage('grading',()=>opts.grade ? opts.grade(observation!,task,profile) : gradeWorkflow(observation!,task,profile,opts.judge)));}
+    catch{checks.push({dimension:'grounding',name:'grader_error',state:'ungraded',required:true,detail:'Grader failed; no model verdict inferred'});}
+    }
   } catch(error) {errors.push({stage:active,kind:error instanceof Error&&/HTTP \d+/.test(error.message)?error.message:'execution_error'});}
   finally {if(environment)try{await stage('cleanup',()=>environment!.close());}catch{errors.push({stage:'cleanup',kind:'cleanup_error'});}}
   const events=environment?.tracer.events??[];
