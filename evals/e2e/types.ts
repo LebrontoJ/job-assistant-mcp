@@ -31,7 +31,7 @@ export type Gold = z.infer<typeof GoldSchema>;
 export type Runtime = z.infer<typeof RuntimeSchema>;
 export type Split = z.infer<typeof SplitSchema>;
 export type Fault = z.infer<typeof FaultSchema>;
-export interface Check { dimension: 'parsing' | 'retrieval' | 'matching' | 'grounding' | 'coverage' | 'writing' | 'reliability'; name: string; state: 'pass' | 'fail' | 'ungraded' | 'skipped'; required: boolean; detail: string }
+export interface Check { dimension: 'parsing' | 'retrieval' | 'matching' | 'grounding' | 'coverage' | 'writing' | 'reliability'; name: string; state: 'pass' | 'fail' | 'ungraded' | 'skipped'; required: boolean; detail: string; numerator?: number; denominator?: number }
 export interface Stage { name: string; ms: number; status: 'ok' | 'error' }
 export interface E2EResult {
   caseId: string; profileId: string; jdFamily: string; split: Split; sample: number; runtime: Runtime; matchMode: z.infer<typeof MatchModeSchema>;

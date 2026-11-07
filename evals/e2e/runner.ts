@@ -1,3 +1,4 @@
+import { gradeWorkflow, type SemanticJudge } from './grading.js';
 import type { TaskReport } from '../../src/agent/task.js';
 import { createEnvironment, type E2EEnvironment, type EnvironmentOptions } from './environment.js';
 import { canonical } from './load.js';
@@ -8,6 +9,7 @@ export interface Observation {
   previewResponse?: any; decisionResponse?: any; retryResponse?: any;
 }
 export interface RunOptions extends EnvironmentOptions {
+  judge?:SemanticJudge;
   sample?:number; officialEligible?:boolean; artifacts?:boolean;
   grade?: (observation:Observation,task:E2ECase,profile:E2EProfile)=>Promise<Check[]>;
   makeEnvironment?:typeof createEnvironment;
@@ -51,8 +53,7 @@ export async function runCase(task:E2ECase,profile:E2EProfile,opts:RunOptions):P
       assert('operation_result_committed',observation.final.operations.some(o=>o.id===operationId&&!!o.result));
       if(task.workflow==='retry_same_key')assert('idempotent_retry',observation.retryResponse.status===200&&canonical(observation.retryResponse.data)===canonical(observation.decisionResponse.data));
     }
-    if(opts.grade)checks.push(...await stage('grading',()=>opts.grade!(observation!,task,profile)));
-    else checks.push({dimension:'grounding',name:'semantic_grading',state:'ungraded',required:true,detail:'Grader not installed'});
+    checks.push(...await stage('grading',()=>opts.grade ? opts.grade(observation!,task,profile) : gradeWorkflow(observation!,task,profile,opts.judge)));
   } catch(error) {errors.push({stage:active,kind:error instanceof Error&&/HTTP \d+/.test(error.message)?error.message:'execution_error'});}
   finally {if(environment)try{await stage('cleanup',()=>environment!.close());}catch{errors.push({stage:'cleanup',kind:'cleanup_error'});}}
   const events=environment?.tracer.events??[];
